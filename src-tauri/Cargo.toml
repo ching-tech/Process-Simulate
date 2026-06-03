@@ -1,6 +1,6 @@
 [package]
 name = "ching-sim"
-version = "0.1.1"
+version = "0.1.2"
 description = "製程 AGV 模擬系統"
 authors = ["Ching Tech 擎添工業"]
 edition = "2021"

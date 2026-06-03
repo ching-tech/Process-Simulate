@@ -31,10 +31,10 @@
 - 為何：桌面需離線；且 Tauri CSP 會擋遠端 script。
 - 影響：純前端版同樣改為本地引用（離線亦可開）。
 
-### D3 CSP 設定（允許 inline）
-`tauri.conf.json` 的 `app.security.csp` 設為允許 `script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:`（含 base64 logo 的 `data:`）。
-- 為何：現有 app 使用 inline `<script>/<style>/onclick`；本地離線 app 無遠端內容，放行 inline 風險可接受。
-- 替代（Level B+）：改用 nonce/外部檔以收緊 CSP。
+### D3 CSP 設定 —— 最終為 `null`（停用）
+原訂放行 inline 的 CSP 字串，但**實測 Tauri v2 在提供 CSP 時會為其注入樣式加 nonce/hash，依 CSP 規範使 `style-src 'unsafe-inline'` 失效，導致 HTML 的 inline `style=""` 屬性全被擋**（選單 `position:fixed`、`<input type=file style="display:none">` 等失效，畫面破版）。本 app 大量使用 inline 樣式屬性。
+- 結論：`app.security.csp` 設為 `null`（停用 CSP）。本地離線、只載本地資源，無遠端內容，停用 CSP 風險可忽略，行為與瀏覽器一致。
+- 替代（未來）：將 inline `style=""` 全面改為 class，再恢復嚴格 CSP（工程量大，非必要）。
 
 ### D4 視窗與打包
 `tauri.conf.json` 設標題、預設尺寸（如 1280×800）、最小尺寸；提供 app 圖示（`src-tauri/icons/`，以 `tauri icon` 由單張 PNG 產生）。建置：`cargo tauri dev`（開發）、`cargo tauri build`（產 `.exe`/`.msi`）。
