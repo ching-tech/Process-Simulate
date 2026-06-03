@@ -1346,9 +1346,11 @@ function drawAgvLegend(tg, lx, ly){
   ];
   items.forEach((it,k)=>{
     const ox=lx+k*96;
-    const cc=ns('circle');cc.setAttribute('cx',ox+7);cc.setAttribute('cy',ly+7);cc.setAttribute('r',8);
+    // 小車圖示（圓角矩形 + 兩輪），與流程圖 AGV 一致
+    const cc=ns('rect');cc.setAttribute('x',ox);cc.setAttribute('y',ly+2);cc.setAttribute('width',16);cc.setAttribute('height',11);cc.setAttribute('rx',3);
     cc.setAttribute('fill',it.col);cc.setAttribute('stroke',it.sc);cc.setAttribute('stroke-width','2');tg.appendChild(cc);
-    const lt=ns('text');lt.setAttribute('x',ox+20);lt.setAttribute('y',ly+11);
+    [ox+2,ox+10].forEach(wx=>{const w=ns('rect');w.setAttribute('x',wx);w.setAttribute('y',ly+13);w.setAttribute('width',4);w.setAttribute('height',2);w.setAttribute('rx',1);w.setAttribute('fill','#3a4356');tg.appendChild(w);});
+    const lt=ns('text');lt.setAttribute('x',ox+22);lt.setAttribute('y',ly+11);
     lt.setAttribute('class','slb');lt.setAttribute('style','fill:#33405a;font-size:11px;text-anchor:start');
     lt.textContent=it.txt; tg.appendChild(lt);
   });
@@ -1728,14 +1730,19 @@ function buildABFAgvSVG(){
     const gi=a.grp-1;
     const gc=GRP_CLR[gi]||GRP_CLR[0];
     const g=ns('g');g.setAttribute('id',`agv-${a.id}`);
-    // Group color ring (outer)
-    const ring=ns('circle');ring.setAttribute('r','15');
+    const rrect=(x,y,w,h,rx)=>{const r=ns('rect');r.setAttribute('x',x);r.setAttribute('y',y);r.setAttribute('width',w);r.setAttribute('height',h);r.setAttribute('rx',rx);return r;};
+    // 群組色外框（圓角矩形）
+    const ring=rrect(-17,-13,34,26,7);
     ring.setAttribute('fill','none');ring.setAttribute('stroke',gc.lbl);
     ring.setAttribute('stroke-width','2');ring.setAttribute('opacity','0.5');
     ring.setAttribute('id',`aring-${a.id}`); g.appendChild(ring);
-    // Main body
-    const c=ns('circle');c.setAttribute('r','12');c.setAttribute('id',`ac-${a.id}`);
-    c.setAttribute('style','fill:#ffffff;stroke:#90a0bc;stroke-width:1.5');g.appendChild(c);
+    // 四個輪子（深色，固定）
+    [[-12,-13],[4,-13],[-12,9],[4,9]].forEach(([wx,wy])=>{const w=rrect(wx,wy,8,4,2);w.setAttribute('fill','#3a4356');g.appendChild(w);});
+    // 車身（搬運車外形；agvBody 依載貨狀態上色）
+    const c=rrect(-14,-10,28,20,5);c.setAttribute('id',`ac-${a.id}`);
+    c.setAttribute('style','fill:#eef2f8;stroke:#90a0bc;stroke-width:2.5');g.appendChild(c);
+    // 兩側感測點（深色，固定，象徵車頭/尾）
+    [-11,11].forEach(sx=>{const d=ns('circle');d.setAttribute('cx',sx);d.setAttribute('cy',0);d.setAttribute('r','1.6');d.setAttribute('fill','#5a6a85');g.appendChild(d);});
     // ID label
     const t=ns('text');t.setAttribute('class','slb');t.setAttribute('dy','0.35em');
     t.setAttribute('id',`at-${a.id}`);
