@@ -6,8 +6,9 @@
 <title>欣興電子 ABF+SMK 製程 AGV 模擬系統</title>
 <script src="vendor/chart.umd.min.js"></script>
 <style>
-:root{--bg:#eef2f8;--surface:#ffffff;--card:#f3f6fb;--border:#cdd8e8;--text:#18233a;--dim:#5a6a85;--accent:#0a6ebd;--green:#00922f;--yellow:#b8860b;--orange:#d9600a;--red:#cc1111;--abf:#1565c0;--smk:#d9600a;
-  --g1:#0277bd;--g2:#00853a;--g3:#7b2fbf;}
+:root{--bg:#eef2f8;--surface:#ffffff;--card:#f3f6fb;--border:#cdd8e8;--text:#18233a;--dim:#475873;--accent:#0a6ebd;--green:#00922f;--yellow:#9a7000;--orange:#d9600a;--red:#cc1111;--abf:#1565c0;--smk:#d9600a;
+  --g1:#0277bd;--g2:#00853a;--g3:#7b2fbf;
+  --trk:#2a3a5c;--trk-ret:#1a2a4c;--slb:#18233a;--llb:#2a3550;--rmap:#3a5a80;--rmap-t:#6878a0;}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column}
 /* ── 兩列式 header：上=資訊列 下=控制列 ── */
@@ -44,10 +45,10 @@ button.pri:hover{color:#fff;filter:brightness(1.08)}
 #bot-toggle:hover{color:var(--accent)}
 #bot-toggle .arrow{transition:transform .25s;font-size:10px}
 #bot-toggle.collapsed .arrow{transform:rotate(180deg)}
-#bot{display:flex;height:155px;border-top:1px solid var(--border);flex-shrink:0;overflow:hidden;transition:height .25s ease}
+#bot{display:flex;height:clamp(120px,16vh,200px);border-top:1px solid var(--border);flex-shrink:0;overflow:hidden;transition:height .25s ease}
 #bot.collapsed{height:0;border-top:none}
 #cw{flex:1;padding:6px}
-#sp{width:255px;padding:10px;border-left:1px solid var(--border);display:flex;flex-direction:column;gap:6px;overflow-y:auto;font-size:12px}
+#sp{width:clamp(220px,20vw,300px);padding:10px;border-left:1px solid var(--border);display:flex;flex-direction:column;gap:6px;overflow-y:auto;font-size:12px}
 .sr{display:flex;justify-content:space-between;align-items:center}
 .sl{font-size:11px;color:var(--dim)}
 .sv{font-size:13px;font-weight:600}
@@ -55,8 +56,8 @@ button.pri:hover{color:#fff;filter:brightness(1.08)}
 .bb{background:var(--red);color:#fff;font-size:10px;padding:1px 5px;border-radius:3px}
 .nob{color:var(--green);font-size:11px}
 #sb{width:0;overflow:hidden;transition:width .3s;border-left:1px solid var(--border);background:var(--surface);flex-shrink:0}
-#sb.open{width:300px}
-#sbi{width:300px;display:flex;flex-direction:column;height:100%}
+#sb.open{width:clamp(300px,24vw,340px)}
+#sbi{width:clamp(300px,24vw,340px);display:flex;flex-direction:column;height:100%}
 #sb-scroll{flex:1;overflow-y:auto;padding:12px 12px 6px}
 .pg{margin-bottom:9px}
 .pg label{display:block;font-size:11px;color:var(--dim);margin-bottom:3px}
@@ -101,9 +102,9 @@ button.pri:hover{color:#fff;filter:brightness(1.08)}
 #sbttl{font-size:13px;font-weight:600;color:var(--accent)}
 /* route mini-map */
 #route-map{width:100%;height:74px;margin-bottom:8px}
-#route-map .rseg{stroke:#3a5a80;stroke-width:2;cursor:pointer}
+#route-map .rseg{stroke:var(--rmap);stroke-width:2;cursor:pointer}
 #route-map .rseg.hot{stroke:var(--accent);stroke-width:3.5}
-#route-map text{fill:#8090b0;font-size:8px;text-anchor:middle}
+#route-map text{fill:var(--rmap-t);font-size:8px;text-anchor:middle}
 .pg.hot input{border-color:var(--accent)}
 /* comparison card */
 #cmp-card{position:fixed;right:18px;bottom:18px;z-index:120;background:var(--surface);border:1px solid var(--accent);border-radius:8px;padding:12px 16px;font-size:12px;min-width:210px;box-shadow:0 4px 20px #000a;opacity:0;transform:translateY(8px);transition:opacity .3s,transform .3s;pointer-events:none}
@@ -112,13 +113,13 @@ button.pri:hover{color:#fff;filter:brightness(1.08)}
 #cmp-card .cmpx{cursor:pointer;color:var(--dim);font-size:14px}
 #cmp-card .crow{display:flex;justify-content:space-between;gap:14px;margin:3px 0}
 #cmp-card .up{color:var(--green)}#cmp-card .dn{color:var(--red)}#cmp-card .eq{color:var(--dim)}
-.track{stroke:#2a3a5c;stroke-width:2.5;fill:none}
-.track-ret{stroke:#1a2a4c;stroke-width:1.5;fill:none;stroke-dasharray:5 4}
+.track{stroke:var(--trk);stroke-width:2.5;fill:none}
+.track-ret{stroke:var(--trk-ret);stroke-width:1.5;fill:none;stroke-dasharray:5 4}
 .bnk{stroke:#d50000;stroke-dasharray:8 4;animation:pls .9s infinite}
 @keyframes pls{0%,100%{opacity:1}50%{opacity:.3}}
 @keyframes mproc{0%,100%{opacity:1;filter:brightness(1)}50%{opacity:.75;filter:brightness(1.4)}}
-.slb{fill:#18233a;font-size:11px;text-anchor:middle;dominant-baseline:middle}
-.llb{fill:#2a3550;font-size:16px;font-weight:700}
+.slb{fill:var(--slb);font-size:11px;text-anchor:middle;dominant-baseline:middle}
+.llb{fill:var(--llb);font-size:16px;font-weight:700}
 .llb2{fill:var(--dim);font-size:11px}
 #ov{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--surface);border:2px solid var(--green);border-radius:8px;padding:24px 32px;text-align:center;z-index:100}
 #ov.show{display:block}
@@ -164,6 +165,58 @@ button.pri:hover{color:#fff;filter:brightness(1.08)}
 .line-card-wrap{position:relative}
 .line-card-tools{position:absolute;top:4px;right:4px;display:flex;gap:3px}
 .line-card-tools button{font-size:11px;padding:2px 5px;line-height:1}
+/* ── 無障礙：鍵盤焦點環（僅鍵盤觸發，不影響滑鼠 hover）── */
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:focus:not(:focus-visible){outline:none}
+/* ── 深色主題（預設淺色；僅覆寫變數，不動版面）── */
+html[data-theme=dark]{
+  --bg:#0f1623;--surface:#16202f;--card:#1c2738;--border:#2c3a50;--text:#e6edf6;--dim:#9fb0c8;
+  --accent:#4aa3e0;--green:#3fae6a;--yellow:#d6a92b;--orange:#ef8a3d;--red:#ef5350;
+  --abf:#5aa9e6;--smk:#ef8a3d;--g1:#4aa3e0;--g2:#3fae6a;--g3:#b083e0;
+  --trk:#5a7196;--trk-ret:#3d5275;--slb:#cdd8ec;--llb:#9fb4d6;--rmap:#5a7aa6;--rmap-t:#8fa2c4;
+}
+html[data-theme=dark] #pb{background:linear-gradient(90deg,var(--abf),var(--accent))}
+html[data-theme=dark] #clk{color:var(--yellow)}
+/* ── 尊重「減少動態」系統偏好 ── */
+@media (prefers-reduced-motion: reduce){
+  *{transition-duration:.001ms !important;animation-duration:.001ms !important;animation-iteration-count:1 !important}
+  .bnk,.agv-proc{animation:none !important}
+}
+/* ── Inline toast 通知 ── */
+#toast-host{position:fixed;right:18px;bottom:18px;z-index:400;display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none}
+.toast{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent);color:var(--text);border-radius:7px;padding:9px 14px;font-size:12px;box-shadow:0 4px 18px #0003;max-width:340px;opacity:0;transform:translateX(12px);transition:opacity .25s,transform .25s;pointer-events:auto}
+.toast.show{opacity:1;transform:translateX(0)}
+.toast.ok{border-left-color:var(--green)}
+.toast.err{border-left-color:var(--red)}
+/* ── Inline 確認彈窗 ── */
+#confirm-ov{display:none;position:fixed;inset:0;z-index:420;background:#0b1322cc;align-items:center;justify-content:center}
+#confirm-ov.show{display:flex}
+#confirm-ov .cbx{background:var(--surface);border:2px solid var(--accent);border-radius:10px;padding:18px 22px;max-width:90vw;width:360px;box-shadow:0 8px 40px #000a}
+#confirm-ov .cmsg{font-size:13px;color:var(--text);line-height:1.6;margin-bottom:16px;white-space:pre-wrap}
+#confirm-ov .crow{display:flex;gap:8px;justify-content:flex-end}
+#confirm-ov .crow button{padding:6px 16px}
+#confirm-ov .crow .ok{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+/* ── 方案比較表 overlay ── */
+#cmp-table-ov{display:none;position:fixed;inset:0;z-index:250;background:#0b1322cc;align-items:center;justify-content:center}
+#cmp-table-ov.show{display:flex}
+#cmp-table-ov .ctx{background:var(--surface);border:2px solid var(--accent);border-radius:10px;padding:18px 22px;max-height:88vh;overflow:auto;box-shadow:0 8px 40px #000a;min-width:460px;max-width:94vw}
+#cmp-table-ov h3{color:var(--accent);font-size:16px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:20px}
+#cmp-table-ov table{border-collapse:collapse;width:100%;font-size:12px;margin-top:6px}
+#cmp-table-ov th,#cmp-table-ov td{padding:6px 12px;text-align:center;border-bottom:1px solid var(--border);white-space:nowrap}
+#cmp-table-ov th:first-child,#cmp-table-ov td:first-child{text-align:left;color:var(--dim);font-weight:600}
+#cmp-table-ov td.best{color:var(--green);font-weight:700}
+#cmp-table-ov .rmcol{cursor:pointer;color:var(--dim);font-size:10px;font-weight:400}
+#cmp-table-ov .rmcol:hover{color:var(--red)}
+#cmp-table-ov .empty{color:var(--dim);font-size:12px;padding:22px 8px;text-align:center}
+.ov-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+/* ── 上手引導 coachmark（浮動卡，不擋操作）── */
+#coach{position:fixed;left:18px;bottom:18px;z-index:330;background:var(--surface);border:1px solid var(--accent);border-left:4px solid var(--accent);border-radius:8px;padding:12px 14px;font-size:12px;max-width:300px;box-shadow:0 4px 20px #0004;display:none}
+#coach.show{display:block}
+#coach h4{font-size:12px;color:var(--accent);margin-bottom:6px}
+#coach ul{margin:0 0 8px 18px;line-height:1.7;color:var(--text)}
+#coach .cbtns{display:flex;justify-content:flex-end}
+.unit-hint{font-size:9px;color:var(--dim);margin-left:5px}
 </style>
 </head>
 <body>
@@ -175,42 +228,45 @@ button.pri:hover{color:#fff;filter:brightness(1.08)}
       <div id="ttl">欣興電子 AGV 模擬</div>
       <div id="clk">00:00:00</div>
       <div id="prog">
-        <div id="pbl">完成 0 / 4000 片</div>
+        <div id="pbl">完成 0 / 4,000 片</div>
         <div id="pbw"><div id="pb"></div></div>
       </div>
     </div>
     <!-- 下：控制列 -->
     <div id="hdr-ctrl">
       <div class="cg">
-        <button id="bplay" onclick="togglePlay()">▶ 播放</button>
-        <div class="seg">
-          <button id="b1x" class="act" onclick="setSpeed(1)">1×</button>
-          <button id="b2x" onclick="setSpeed(2)">2×</button>
-          <button id="b5x" onclick="setSpeed(5)">5×</button>
-          <button id="b10x" onclick="setSpeed(10)">10×</button>
+        <button id="bplay" class="pri" onclick="togglePlay()" aria-label="播放或暫停模擬（空白鍵）">▶ 播放</button>
+        <div class="seg" role="group" aria-label="模擬速度">
+          <button id="b1x" class="act" onclick="setSpeed(1)" aria-label="速度 1 倍">1×</button>
+          <button id="b2x" onclick="setSpeed(2)" aria-label="速度 2 倍">2×</button>
+          <button id="b5x" onclick="setSpeed(5)" aria-label="速度 5 倍">5×</button>
+          <button id="b10x" onclick="setSpeed(10)" aria-label="速度 10 倍">10×</button>
         </div>
-        <button id="btn-fast" class="pri" onclick="fastForward()">⏩ 立即結果</button>
+        <button id="btn-fast" onclick="fastForward()" aria-label="立即跑到結果（右方向鍵）">⏩ 立即結果</button>
       </div>
       <div class="hdr-sep"></div>
       <div class="cg">
-        <button class="rst" onclick="resetSim()">↺ 重置</button>
-        <button class="rst" onclick="backToSelect()">⇄ 切換線</button>
+        <button class="rst" onclick="resetSim()" aria-label="重置模擬（R）">↺ 重置</button>
+        <button class="rst" onclick="backToSelect()" aria-label="切換製程線">⇄ 切換線</button>
       </div>
       <div class="hdr-sep"></div>
       <div class="cg">
-        <button id="btn-view" onclick="toggleView()">▤ 精簡</button>
-        <button onclick="toggleAgvBoard()">📊 看板</button>
-        <button onclick="resetCamera()">⤢ 視角</button>
-        <button onclick="toggleSB()">⚙ 參數</button>
+        <button id="btn-view" onclick="toggleView()" aria-label="切換精簡或詳細視圖">▤ 精簡</button>
+        <button onclick="toggleAgvBoard()" aria-label="開啟 AGV 稼動看板">📊 看板</button>
+        <button onclick="openComparison()" aria-label="開啟方案比較表">📋 比較</button>
+        <button onclick="resetCamera()" aria-label="重置流程圖視角">⤢ 視角</button>
+        <button onclick="toggleSB()" aria-label="開關參數面板（P）">⚙ 參數</button>
+        <button id="btn-theme" onclick="toggleTheme()" aria-label="切換深色或淺色主題">🌙 深色</button>
+        <button onclick="showCoach()" aria-label="顯示操作提示">？</button>
       </div>
     </div>
   </div>
 </div>
 <div id="main">
  <div id="fw">
-  <svg id="fsvg" viewBox="0 0 1400 870" preserveAspectRatio="xMidYMid meet">
+  <svg id="fsvg" viewBox="0 0 1400 870" preserveAspectRatio="xMidYMid meet" role="img" aria-label="製程線流程圖：站別、軌道與 AGV 動態視覺化">
     <text id="abf-hdr" x="10" y="22" class="llb">ABF 製程線</text>
-    <text id="abf-hdr2" x="10" y="35" class="llb2">● 滿框(綠)  ○ 空框(橘)  ▶ 加工中(藍)  ◌ AGV預訂(淡綠)</text>
+    <text id="abf-hdr2" x="10" y="35" class="llb2">● 滿框(綠)  ○ 空框(橘)  ▶ 加工中(藍)  ◌ AGV預訂(淡綠)  ｜ AGV車頂：●載滿框 / ○載空框</text>
     <text id="smk-hdr" x="10" y="218" class="llb">SMK 製程線</text>
     <text id="smk-hdr2" x="10" y="229" class="llb2">Cycle: 35:50 ｜ 9 AGV ｜ 12 pcs/cycle</text>
     <g id="abf-tracks"></g><g id="smk-tracks"></g>
@@ -229,11 +285,11 @@ button.pri:hover{color:#fff;filter:brightness(1.08)}
       <div id="row-auph" class="sr"><span class="sl">ABF UPH</span><span class="sv abf" id="s-auph">—</span></div>
       <div id="row-suph" class="sr"><span class="sl">SMK UPH</span><span class="sv smk" id="s-suph">—</span></div>
       <div class="sr"><span class="sl">已完成</span><span class="sv grn" id="s-done">0 片</span></div>
-      <div class="sr"><span class="sl">目標</span><span class="sv" id="s-tgt">4000 片</span></div>
+      <div class="sr"><span class="sl">目標</span><span class="sv" id="s-tgt">4,000 片</span></div>
       <div class="sr"><span class="sl">預估完成</span><span class="sv" id="s-eta">—</span></div>
       <div id="bnk-section"><hr style="border-color:var(--border)">
       <div style="font-size:11px;font-weight:600;color:var(--red)">瓶頸警示（PORT 堆積）</div>
-      <div id="bnklist"><div class="nob">目前無瓶頸</div></div></div>
+      <div id="bnklist"><div class="nob">目前無瓶頸</div></div><div id="bnk-advice"></div></div>
     </div>
   </div>
  </div>
@@ -244,18 +300,50 @@ button.pri:hover{color:#fff;filter:brightness(1.08)}
 </div>
 <div id="cmp-card"></div>
 <div id="stn-tip"></div>
+<div id="toast-host" role="status" aria-live="polite"></div>
+<div id="sr-live" aria-live="polite" aria-atomic="true" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"></div>
+<div id="coach" role="dialog" aria-label="操作提示">
+  <h4>💡 操作小提示</h4>
+  <ul>
+    <li>滑鼠移到<b>站別</b>可看每小時 UPH</li>
+    <li>在流程圖上<b>滾輪</b>可縮放</li>
+    <li><b>拖曳</b>流程圖可平移視角</li>
+  </ul>
+  <div class="cbtns"><button class="mini" onclick="hideCoach(true)">知道了</button></div>
+</div>
+<div id="confirm-ov">
+  <div class="cbx" role="dialog" aria-modal="true" aria-labelledby="confirm-msg">
+    <div class="cmsg" id="confirm-msg"></div>
+    <div class="crow">
+      <button id="confirm-cancel">取消</button>
+      <button id="confirm-ok" class="ok">確定</button>
+    </div>
+  </div>
+</div>
 <div id="agv-board" onclick="if(event.target===this)toggleAgvBoard()">
-  <div class="abx">
-    <h3><span>📊 AGV 稼動看板</span><span class="abclose" onclick="toggleAgvBoard()">✕</span></h3>
+  <div class="abx" role="dialog" aria-modal="true" aria-labelledby="agv-board-title">
+    <h3><span id="agv-board-title">📊 AGV 稼動看板</span><span class="abclose" onclick="toggleAgvBoard()" role="button" tabindex="0" aria-label="關閉看板">✕</span></h3>
     <div class="absub">動作 = 移動 + 取放　｜　稼動率 = 動作 ÷（動作 + 閒置）</div>
+    <div class="ov-actions" style="justify-content:flex-start;margin:0 0 10px">
+      <button onclick="exportResultPNG()" aria-label="匯出 PNG 圖片報告">🖼 匯出 PNG</button>
+      <button onclick="exportResultCSV()" aria-label="匯出 CSV 資料">⬇ CSV 資料</button>
+    </div>
     <div id="agv-board-body"></div>
+  </div>
+</div>
+<div id="cmp-table-ov" onclick="if(event.target===this)closeComparison()">
+  <div class="ctx" role="dialog" aria-modal="true" aria-labelledby="cmp-table-title">
+    <h3><span id="cmp-table-title">📋 方案比較</span><span class="abclose" onclick="closeComparison()" role="button" tabindex="0" aria-label="關閉比較表">✕</span></h3>
+    <div style="color:var(--dim);font-size:11px">釘選多次模擬結果並排比較；每列標示最佳值（UPH 高佳、ETA 短佳）。</div>
+    <div class="ov-actions" style="justify-content:flex-start"><button onclick="pinScenario()" aria-label="釘選目前結果">📌 釘選目前結果</button></div>
+    <div id="cmp-table-body"></div>
   </div>
 </div>
 <input id="import-file" type="file" accept=".json" style="display:none" onchange="importParams(event)">
 <input id="import-line" type="file" accept=".json" style="display:none" onchange="importLineFile(event)">
 <div id="line-wizard" onclick="if(event.target===this)closeWizard()">
-  <div class="wz">
-    <h3><span id="wz-title">新增製程線</span><span class="wzclose" onclick="closeWizard()">✕</span></h3>
+  <div class="wz" role="dialog" aria-modal="true" aria-labelledby="wz-title">
+    <h3><span id="wz-title">新增製程線</span><span class="wzclose" onclick="closeWizard()" role="button" tabindex="0" aria-label="關閉精靈">✕</span></h3>
     <div class="wsec"><h4>① 基本</h4>
       <label>名稱</label><input id="wz-name" placeholder="例如：FCBGA 線" style="width:160px">
       <label>每框片數</label><input id="wz-batch" type="number" min="1" value="1" style="width:56px">
@@ -279,8 +367,14 @@ button.pri:hover{color:#fff;filter:brightness(1.08)}
     </div>
   </div>
 </div>
-<div id="ov"><h2 id="ovh">模擬完成</h2><p id="ovm"></p>
-  <button onclick="document.getElementById('ov').classList.remove('show')" style="margin-top:12px">關閉</button>
+<div id="ov" role="dialog" aria-modal="true" aria-labelledby="ovh"><h2 id="ovh">模擬完成</h2><p id="ovm"></p>
+  <div class="ov-actions">
+    <button onclick="exportResultPNG()" aria-label="匯出 PNG 圖片報告">🖼 匯出 PNG</button>
+    <button onclick="exportResultCSV()" aria-label="匯出 CSV 資料">CSV</button>
+    <button onclick="pinScenario();toast('已釘選此方案','ok')" aria-label="釘選此方案">📌 釘選</button>
+    <button onclick="openComparison()" aria-label="開啟方案比較">📋 比較</button>
+  </div>
+  <button onclick="closeOv()" style="margin-top:12px">關閉</button>
 </div>
 
 <div id="sel-ov" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#eef2f8;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;gap:10px">
@@ -773,7 +867,7 @@ function initSim(){
   updateUI();
   document.getElementById('bplay').textContent='▶ 播放';
   document.getElementById('ov').classList.remove('show');
-  document.getElementById('s-tgt').textContent=P.tg+' 片';
+  document.getElementById('s-tgt').textContent=nf(P.tg)+' 片';
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -896,11 +990,15 @@ const BNK_TH=150; // 瓶頸判定門檻（秒）
 function refreshBottleneck(){
   const bl=document.getElementById('bnklist'); if(!bl) return;
   const piles=abfSt.filter(s=>(s.pileT||0)>BNK_TH).sort((a,b)=>(b.pileT||0)-(a.pileT||0));
-  if(!piles.length){ bl.innerHTML='<div class="nob">目前無瓶頸</div>'; return; }
+  if(!piles.length){ bl.innerHTML='<div class="nob">目前無瓶頸</div>'; renderAdvice([]); _announcedBnk.clear(); return; }
   bl.innerHTML=piles.map(s=>`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">`
     +`<span class="bb">堆積</span><span style="font-size:11px;margin:0 4px;flex:1">${s.name}</span>`
     +`<span style="color:var(--red);font-size:12px;font-weight:bold">${Math.round(s.pileT)}s</span></div>`).join('');
+  renderAdvice(piles);
+  // 里程碑播報：僅對「新出現」的瓶頸站播一次（去重，不每幀念）
+  for(const s of piles){ const k=s.name; if(!_announcedBnk.has(k)){ _announcedBnk.add(k); announce(`出現瓶頸：${s.name.replace(/_\d+$/,'')} 出口堆積`); break; } }
 }
+const _announcedBnk=new Set();
 
 // ══════════════════════════════════════════════════════════════
 // ABF DROPOFF（放貨）
@@ -1011,8 +1109,8 @@ function checkDone(){
   if(tot>=P.tg){
     running=false;
     document.getElementById('bplay').textContent='▶ 播放';
-    document.getElementById('ovm').textContent=`已完成 ${tot} 片，模擬時間 ${fmt(simT)}`;
-    document.getElementById('ov').classList.add('show');
+    document.getElementById('ovm').textContent=`已完成 ${nf(tot)} 片，模擬時間 ${fmt(simT)}`;
+    openOv();
   }
 }
 
@@ -1076,15 +1174,19 @@ function showFastResult(){
   let msg;
   if(reached){
     if(ovh) ovh.textContent='✅ 達成目標';
-    msg=`完成 ${P.tg} 片<br>模擬時間 <b>${fmt(simT)}</b><br>平均產能 <b>${avg}</b> 片/hr`;
+    msg=`完成 ${nf(P.tg)} 片<br>模擬時間 <b>${fmt(simT)}</b><br>平均產能 <b>${nf(avg)}</b> 片/hr`;
   } else {
     if(ovh) ovh.textContent='⏱ 計算結果（達上限）';
     let eta='—'; if(recentUph>0) eta=fmt(simT + (P.tg-done)/recentUph*3600);
-    msg=`已模擬 ${fmt(simT)}<br>完成 ${done} / ${P.tg} 片<br>目前 UPH ${recentUph} 片/hr<br>預估達標時間 <b>${eta}</b>`;
+    msg=`已模擬 ${fmt(simT)}<br>完成 ${nf(done)} / ${nf(P.tg)} 片<br>目前 UPH ${nf(recentUph)} 片/hr<br>預估達標時間 <b>${eta}</b>`;
   }
   if(ovm) ovm.innerHTML=msg;
-  document.getElementById('ov').classList.add('show');
+  openOv();
 }
+function openOv(){ const ov=document.getElementById('ov'); ov.classList.add('show'); trapFocus(ov);
+  const h=document.getElementById('ovh'), m=document.getElementById('ovm');
+  announce(`${h?h.textContent:'模擬完成'}。${m?m.textContent:''}`); }
+function closeOv(){ document.getElementById('ov').classList.remove('show'); releaseFocus(); }
 function resetSim(){running=false;if(rafId)cancelAnimationFrame(rafId);liveMarks=[];renderLiveMarks();initSim();}
 function toggleBot(){
   const bot=document.getElementById('bot');
@@ -1214,10 +1316,11 @@ function updateSimpleAgvPos(a){
   const ring=document.getElementById(`aring-${a.id}`);
   agvBody(a, c, ring, carrying);
   const cd=document.getElementById(`acd-${a.id}`);
+  const cs=document.getElementById(`acds-${a.id}`);
   if(cd){
-    if(carrying && a.cargo==='full'){cd.setAttribute('fill','#00c853');cd.setAttribute('stroke','#0a6b2e');cd.setAttribute('stroke-width','1.5');}
-    else if(carrying && a.cargo==='empty'){cd.setAttribute('fill','#ff9800');cd.setAttribute('stroke','#b35e00');cd.setAttribute('stroke-width','1.5');}
-    else {cd.setAttribute('fill','none');cd.setAttribute('stroke','none');}
+    if(carrying && a.cargo==='full'){cd.setAttribute('fill','#00c853');cd.setAttribute('stroke','#0a6b2e');cd.setAttribute('stroke-width','1.5');if(cs)cs.textContent='●';}
+    else if(carrying && a.cargo==='empty'){cd.setAttribute('fill','#ff9800');cd.setAttribute('stroke','#b35e00');cd.setAttribute('stroke-width','1.5');if(cs)cs.textContent='○';}
+    else {cd.setAttribute('fill','none');cd.setAttribute('stroke','none');if(cs)cs.textContent='';}
   }
 }
 function setViewMode(m){
@@ -1702,7 +1805,8 @@ function toggleAgvBoard(){
   agvBoardOpen=!agvBoardOpen;
   const el=document.getElementById('agv-board');
   if(el) el.classList.toggle('show',agvBoardOpen);
-  if(agvBoardOpen) renderAgvBoard();
+  if(agvBoardOpen){ renderAgvBoard(); trapFocus(el&&el.querySelector('.abx')); }
+  else releaseFocus();
 }
 function renderAgvBoard(){
   const body=document.getElementById('agv-board-body'); if(!body) return;
@@ -1753,6 +1857,12 @@ function buildABFAgvSVG(){
     cd.setAttribute('id',`acd-${a.id}`);
     cd.setAttribute('fill','none');cd.setAttribute('stroke','none');
     g.appendChild(cd);
+    // 載貨形狀符號（色盲冗餘：滿框●／空框○，去色仍可分辨）
+    const cs=ns('text');
+    cs.setAttribute('x',0);cs.setAttribute('y',-16);cs.setAttribute('dy','0.35em');
+    cs.setAttribute('text-anchor','middle');cs.setAttribute('id',`acds-${a.id}`);
+    cs.setAttribute('style','font-size:11px;font-weight:bold;fill:#fff;pointer-events:none');
+    cs.textContent='';g.appendChild(cs);
     // Status label below
     const lbl=ns('text');lbl.setAttribute('class','slb');
     lbl.setAttribute('y','26');lbl.setAttribute('style','font-size:9px;font-weight:bold;fill:#c79100');
@@ -1880,22 +1990,23 @@ function updateUI(){
   if(agvBoardOpen) renderAgvBoard();
 }
 
+const nf=n=>Number(n||0).toLocaleString('en-US');
 function updateProgressAndStats(tot, uph){
   uph=uph||0;
   const pct=Math.min(100,tot/P.tg*100);
   document.getElementById('pb').style.width=pct+'%';
-  document.getElementById('pbl').textContent=`完成 ${tot} / ${P.tg} 片`;
-  const au=document.getElementById('s-auph'); if(au) au.textContent=uph>0?`${uph} 片/hr`:'—';
-  document.getElementById('s-done').textContent=tot+' 片';
+  document.getElementById('pbl').textContent=`完成 ${nf(tot)} / ${nf(P.tg)} 片`;
+  const au=document.getElementById('s-auph'); if(au) au.textContent=uph>0?`${nf(uph)} 片/hr`:'—';
+  document.getElementById('s-done').textContent=nf(tot)+' 片';
   let etaTxt='—';
   if(uph>0&&tot<P.tg){ etaTxt=fmt(simT+(P.tg-tot)/uph*3600); }
   document.getElementById('s-eta').textContent=etaTxt;
   // mini stats in toggle bar when bot is collapsed
   const mini=document.getElementById('bot-mini');
   if(mini){
-    const uphDisp=uph>0?`${uph} 片/hr`:'—';
+    const uphDisp=uph>0?`${nf(uph)} 片/hr`:'—';
     mini.textContent=document.getElementById('bot').classList.contains('collapsed')
-      ? `完成 ${tot} 片　UPH ${uphDisp}　預估完成 ${etaTxt}` : '';
+      ? `完成 ${nf(tot)} 片　UPH ${uphDisp}　預估完成 ${etaTxt}` : '';
   }
   if(cmpState) renderCompareCard(); // 對比卡隨模擬即時更新差值
 }
@@ -1938,11 +2049,12 @@ function updateABFAgvPos(a){
   const carrying = (a.phase==='delivering'||a.phase==='dropping');
   agvBody(a, c, ring, carrying);
 
-  // 車頂載貨標記：載滿框=綠、載空框=橘、空手=隱藏
+  // 車頂載貨標記：載滿框=綠●、載空框=橘○、空手=隱藏（●/○ 為色盲冗餘）
+  const cs=document.getElementById(`acds-${a.id}`);
   if(cd){
-    if(carrying && a.cargo==='full'){ cd.setAttribute('fill','#00c853');cd.setAttribute('stroke','#0a6b2e');cd.setAttribute('stroke-width','1.5'); }
-    else if(carrying && a.cargo==='empty'){ cd.setAttribute('fill','#ff9800');cd.setAttribute('stroke','#b35e00');cd.setAttribute('stroke-width','1.5'); }
-    else { cd.setAttribute('fill','none');cd.setAttribute('stroke','none'); }
+    if(carrying && a.cargo==='full'){ cd.setAttribute('fill','#00c853');cd.setAttribute('stroke','#0a6b2e');cd.setAttribute('stroke-width','1.5');if(cs)cs.textContent='●'; }
+    else if(carrying && a.cargo==='empty'){ cd.setAttribute('fill','#ff9800');cd.setAttribute('stroke','#b35e00');cd.setAttribute('stroke-width','1.5');if(cs)cs.textContent='○'; }
+    else { cd.setAttribute('fill','none');cd.setAttribute('stroke','none');if(cs)cs.textContent=''; }
   }
 
   const lbl=document.getElementById(`albl-${a.id}`);
@@ -2075,16 +2187,25 @@ function fieldHTML(m){
   const id='p-'+m.key;
   const tag=m.apply==='live'?'<span class="ptag live">⚡即時</span>':'<span class="ptag resim">↻重跑</span>';
   const unit=m.unit?`<span class="unit">${m.unit}</span>`:'';
+  const hint=(m.unit==='秒'&&m.type!=='mmss')?`<span class="unit-hint" id="mh-${m.key}"></span>`:'';
   let input;
   if(m.type==='mmss'){
     input=`<input id="${id}" data-key="${m.key}" inputmode="text">`;
   } else {
     input=`<div class="stp">`
-      +`<button type="button" tabindex="-1" onclick="stepField('${m.key}',-1)">−</button>`
-      +`<input id="${id}" data-key="${m.key}" type="number" inputmode="numeric"${m.min!=null?` min="${m.min}"`:''}${m.max!=null?` max="${m.max}"`:''}>`
-      +`<button type="button" tabindex="-1" onclick="stepField('${m.key}',1)">＋</button></div>`;
+      +`<button type="button" tabindex="-1" aria-label="${m.label} 減少" onclick="stepField('${m.key}',-1)">−</button>`
+      +`<input id="${id}" data-key="${m.key}" type="number" inputmode="numeric" aria-label="${m.label}"${m.min!=null?` min="${m.min}"`:''}${m.max!=null?` max="${m.max}"`:''}>`
+      +`<button type="button" tabindex="-1" aria-label="${m.label} 增加" onclick="stepField('${m.key}',1)">＋</button></div>`;
   }
-  return `<div class="pg" id="pg-${m.key}" data-line="${m.line}"><label>${m.label}${unit}${tag}</label>${input}<div class="err"></div></div>`;
+  return `<div class="pg" id="pg-${m.key}" data-line="${m.line}"><label>${m.label}${unit}${hint}${tag}</label>${input}<div class="err"></div></div>`;
+}
+// 秒→分 換算提示（僅顯示輔助，不改底層以秒計算）
+function updateUnitHint(m){
+  if(!(m.unit==='秒'&&m.type!=='mmss')) return;
+  const inp=document.getElementById('p-'+m.key), el=document.getElementById('mh-'+m.key);
+  if(!inp||!el) return;
+  const v=parseFloat(inp.value);
+  el.textContent=(isFinite(v)&&v>0)?`≈ ${(v/60).toFixed(v%60===0?0:1)} 分`:'';
 }
 function renderParamPanel(){
   if(!scnStore) scnStore=loadScenarioStore();
@@ -2113,11 +2234,12 @@ function renderParamPanel(){
     +`<button onclick="document.getElementById('import-file').click()" class="mini" style="flex:1">⬆匯入</button></div>`;
   ALL_META.forEach(m=>{
     const el=document.getElementById('p-'+m.key);
-    if(el) el.addEventListener('input',()=>{validateField(m);refreshDirty();});
+    if(el) el.addEventListener('input',()=>{validateField(m);updateUnitHint(m);refreshDirty();});
   });
   buildRouteMap();
   restoreSecState();
   applyParamsToInputs(P);
+  ALL_META.forEach(updateUnitHint);   // 初始換算提示
   const sel=document.getElementById('scenario-sel'); if(sel) sel.value=scnStore.active;
   applyLineFilter();
   refreshDirty();
@@ -2150,7 +2272,7 @@ function stepField(key,dir){
   let v=+el.value||0; v+=dir*(m.step||1);
   if(m.min!=null)v=Math.max(m.min,v);
   if(m.max!=null)v=Math.min(m.max,v);
-  el.value=v; validateField(m); refreshDirty();
+  el.value=v; validateField(m); updateUnitHint(m); refreshDirty();
 }
 
 // ── 驗證（inline，取代 alert）──
@@ -2214,18 +2336,20 @@ function applyP(){
     resetSim();
     if(autoplay&&!running) togglePlay();
     showCompareCard(before,'重新模擬');
+    announce('已套用參數並重新模擬');
   } else if(live.length){
     for(const m of live) applyLiveParam(m.key,inp[m.key]);
     persistActiveScenario();
     markLiveChange(live.map(m=>m.label.replace('🎯 ','')).join('、'));
     updateUI();
     showCompareCard(before,'即時套用：'+live.map(m=>m.label.replace('🎯 ','')).join('、'));
+    announce('已即時套用參數');
   }
   refreshDirty();
 }
 function applyLiveParam(key,val){
   // SMK 改 ABF 式固定分組後，即時參數僅剩目標產量
-  if(key==='tg'){P.tg=val;const t=document.getElementById('s-tgt');if(t)t.textContent=val+' 片';}
+  if(key==='tg'){P.tg=val;const t=document.getElementById('s-tgt');if(t)t.textContent=nf(val)+' 片';}
 }
 
 // ── 套用前後對比卡 ──
@@ -2256,6 +2380,192 @@ function renderCompareCard(){
   const d=document.getElementById('cmp-done'); if(d) d.textContent=`${a.done} 片`;
 }
 function hideCompareCard(){cmpState=null;const c=document.getElementById('cmp-card');if(c)c.classList.remove('show');}
+
+// ══════════════════════════════════════════════════════════════
+// 彈窗 focus trap（支援巢狀；每次 Tab 即時查詢可聚焦集合 → 涵蓋動態內容）
+// ══════════════════════════════════════════════════════════════
+const _focusStack=[];
+function _focusables(c){return Array.from(c.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')).filter(el=>el.offsetWidth>0||el.offsetHeight>0||el===document.activeElement);}
+function trapFocus(container){
+  if(!container) return;
+  const entry={container,ret:document.activeElement,handler:null};
+  entry.handler=e=>{
+    if(e.key!=='Tab') return;
+    const f=_focusables(container); if(!f.length) return;
+    const first=f[0], last=f[f.length-1];
+    if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+    else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+    else if(!container.contains(document.activeElement)){ e.preventDefault(); first.focus(); }
+  };
+  container.addEventListener('keydown',entry.handler);
+  _focusStack.push(entry);
+  const f=_focusables(container); if(f.length) f[0].focus();
+}
+function releaseFocus(container){
+  if(!_focusStack.length) return;
+  let idx=_focusStack.length-1;
+  if(container){ for(let i=_focusStack.length-1;i>=0;i--) if(_focusStack[i].container===container){idx=i;break;} }
+  const entry=_focusStack.splice(idx,1)[0];
+  entry.container.removeEventListener('keydown',entry.handler);
+  if(entry.ret&&entry.ret.focus){ try{entry.ret.focus();}catch(_){} }
+}
+
+// ── 上手引導 coachmark ──
+function showCoach(){ const el=document.getElementById('coach'); if(el) el.classList.add('show'); }
+function hideCoach(remember){ const el=document.getElementById('coach'); if(el) el.classList.remove('show');
+  if(remember){ try{ localStorage.setItem('sim-onboarded','1'); }catch(_){} } }
+function maybeShowCoach(){ let seen=null; try{ seen=localStorage.getItem('sim-onboarded'); }catch(_){} if(!seen) showCoach(); }
+
+// ══════════════════════════════════════════════════════════════
+// 決策價值：結果匯出（PNG/CSV）／方案比較表／瓶頸建議
+// ══════════════════════════════════════════════════════════════
+// 彙整目前模擬結果（只讀既有狀態，不碰引擎）
+function gatherResults(){
+  const st=snapshotStats();                       // {uph,eta,done,simT}
+  const bp=BLUEPRINTS[selectedLine]||{};
+  const piles=(typeof abfSt!=='undefined'?abfSt:[]).filter(s=>(s.pileT||0)>BNK_TH).sort((a,b)=>(b.pileT||0)-(a.pileT||0));
+  const worst=piles[0]?{name:piles[0].name.replace(/_\d+$/,''),pileT:Math.round(piles[0].pileT)}:null;
+  const groups={}; let sm=0,sh=0,si=0;
+  for(const a of abfAGVs){
+    const g=a.grp||1; (groups[g]=groups[g]||{mv:0,hd:0,id:0,n:0});
+    groups[g].mv+=a.tMove||0; groups[g].hd+=a.tHandle||0; groups[g].id+=a.tIdle||0; groups[g].n++;
+    sm+=a.tMove||0; sh+=a.tHandle||0; si+=a.tIdle||0;
+  }
+  const grpUtil=Object.keys(groups).sort().map(g=>{const o=groups[g],act=o.mv+o.hd,den=act+o.id;
+    return {name:(GRP_CLR[g-1]||{}).name||('G'+g),util:den>0?act/den:0,n:o.n};});
+  const tAct=sm+sh,tDen=tAct+si;
+  return {line:bp.name||selectedLine||'—',done:st.done,target:P.tg,uph:st.uph,eta:st.eta,simT:st.simT,
+    worst,grpUtil,avgUtil:tDen>0?tAct/tDen:0,reached:st.done>=P.tg,
+    perStn:(typeof abfSt!=='undefined'?abfSt:[]),perAgv:abfAGVs};
+}
+function nowStamp(){const d=new Date();const p=n=>String(n).padStart(2,'0');
+  return {disp:`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`,
+          file:`${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`};}
+function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src;});}
+// 一鍵 PNG 圖片報告（原生 Canvas 自繪，零相依；報告固定淺色便於列印/分享）
+async function exportResultPNG(){
+  if(!selectedLine || (typeof abfPcs==='undefined') || abfPcs<=0){ toast('尚無結果可匯出','err'); return; }
+  const R=gatherResults(), ts=nowStamp();
+  const dpr=Math.min(3,window.devicePixelRatio||1), W=540, H=470;
+  const cv=document.createElement('canvas'); cv.width=W*dpr; cv.height=H*dpr;
+  const x=cv.getContext('2d'); x.scale(dpr,dpr);
+  const C={acc:'#0a6ebd',txt:'#18233a',dim:'#5a6a85',bd:'#cdd8e8',card:'#f3f6fb',grn:'#00922f',red:'#cc1111'};
+  x.fillStyle='#fff'; x.fillRect(0,0,W,H);
+  // 標題列
+  x.fillStyle=C.acc; x.fillRect(0,0,W,56);
+  try{ const img=await loadImg(LOGO_SRC); const ih=38,iw=img.width*ih/img.height; x.drawImage(img,16,9,iw,ih);
+       x.fillStyle='#fff'; x.font='700 18px "Segoe UI",system-ui,sans-serif'; x.fillText(`欣興電子　${R.line} 模擬報告`,16+iw+14,26);
+       x.font='400 12px "Segoe UI",system-ui,sans-serif'; x.fillText(ts.disp,16+iw+14,44);
+  }catch(_){ x.fillStyle='#fff'; x.font='700 18px "Segoe UI",system-ui,sans-serif'; x.fillText(`${R.line} 模擬報告`,16,26);
+       x.font='400 12px "Segoe UI",system-ui,sans-serif'; x.fillText(ts.disp,16,44); }
+  // 摘要四宮格
+  const cards=[['完成 / 目標',`${nf(R.done)} / ${nf(R.target)} 片`],['平均 UPH',`${nf(R.uph)} 片/hr`],
+               ['模擬時間',fmt(R.simT)],['達標 ETA',R.reached?'已達標':R.eta]];
+  const cw=(W-16*2-12)/2;
+  cards.forEach((c,i)=>{const cx=16+(i%2)*(cw+12), cy=70+Math.floor(i/2)*48;
+    x.fillStyle=C.card; roundRect(x,cx,cy,cw,40,6); x.fill();
+    x.fillStyle=C.dim; x.font='400 11px "Segoe UI",system-ui,sans-serif'; x.fillText(c[0],cx+10,cy+16);
+    x.fillStyle=C.txt; x.font='700 16px "Segoe UI",system-ui,sans-serif'; x.fillText(c[1],cx+10,cy+33);});
+  // 最重瓶頸
+  let y=176; x.font='600 12px "Segoe UI",system-ui,sans-serif';
+  x.fillStyle=R.worst?C.red:C.grn;
+  x.fillText(R.worst?`最重瓶頸：${R.worst.name}（出口堆積 ${R.worst.pileT}s）`:'最重瓶頸：無',16,y);
+  // AGV 群組稼動條
+  y+=18; x.fillStyle=C.dim; x.font='600 11px "Segoe UI",system-ui,sans-serif'; x.fillText('AGV 群組稼動率',16,y); y+=8;
+  R.grpUtil.forEach(g=>{y+=18; const pct=Math.round(g.util*100), bx=70, bw=W-70-70;
+    x.fillStyle=C.txt; x.font='400 11px "Segoe UI",system-ui,sans-serif'; x.fillText(`${g.name}(${g.n})`,16,y+3);
+    x.fillStyle=C.card; roundRect(x,bx,y-7,bw,11,5); x.fill();
+    x.fillStyle=C.acc; roundRect(x,bx,y-7,bw*g.util,11,5); x.fill();
+    x.fillStyle=C.dim; x.fillText(`${pct}%`,bx+bw+8,y+3);});
+  // 內嵌 UPH 趨勢圖
+  y+=22; x.fillStyle=C.dim; x.font='600 11px "Segoe UI",system-ui,sans-serif'; x.fillText('UPH 趨勢',16,y); y+=6;
+  const uc=document.getElementById('uc'), rx=16, rw=W-32, rh=H-y-30;
+  x.strokeStyle=C.bd; x.strokeRect(rx,y,rw,rh);
+  if(uc && uc.width>0 && uc.height>0){ try{ x.drawImage(uc,rx+1,y+1,rw-2,rh-2);}catch(_){} }
+  else { x.fillStyle=C.dim; x.font='400 11px "Segoe UI",system-ui,sans-serif'; x.fillText('（無趨勢資料）',rx+10,y+rh/2); }
+  // 頁尾
+  x.fillStyle=C.dim; x.font='400 10px "Segoe UI",system-ui,sans-serif';
+  x.fillText(`擎添工業 Ching Tech · 產生於 ${ts.disp}`,16,H-12);
+  cv.toBlob(b=>{ if(!b){ toast('匯出失敗','err'); return; }
+    const a=document.createElement('a'); a.href=URL.createObjectURL(b);
+    a.download=`report-${R.line}-${ts.file}.png`; a.click(); URL.revokeObjectURL(a.href);
+    toast('已匯出 PNG 報告','ok'); },'image/png');
+}
+function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+// CSV 資料匯出（次要；UTF-8 BOM）
+function exportResultCSV(){
+  if(!selectedLine || (typeof abfPcs==='undefined') || abfPcs<=0){ toast('尚無結果可匯出','err'); return; }
+  const R=gatherResults(), ts=nowStamp(), q=s=>`"${String(s).replace(/"/g,'""')}"`;
+  let rows=[];
+  rows.push(['# 摘要']); rows.push(['線別','完成片數','目標','平均UPH','模擬時間','達標ETA']);
+  rows.push([R.line,R.done,R.target,R.uph,fmt(R.simT),R.reached?'已達標':R.eta]); rows.push([]);
+  rows.push(['# 站別每小時 UPH']);
+  const maxH=Math.max(1,...R.perStn.map(s=>(s.prodHist||[]).length));
+  const hh=['站名']; for(let i=0;i<maxH;i++) hh.push(`${i}-${i+1}hr`); hh.push('平均'); rows.push(hh);
+  R.perStn.forEach(s=>{const ph=s.prodHist||[]; if(!ph.length)return;
+    const r=[s.name]; let sum=0,c=0; for(let i=0;i<maxH;i++){const v=ph[i]||0; r.push(v); if(i<ph.length){sum+=v;c++;}}
+    r.push(c>0?Math.round(sum/c):0); rows.push(r);}); rows.push([]);
+  rows.push(['# AGV 稼動']); rows.push(['車','群組','移動秒','取放秒','閒置秒','稼動率%']);
+  R.perAgv.forEach(a=>{const mv=a.tMove||0,hd=a.tHandle||0,id=a.tIdle||0,act=mv+hd,den=act+id;
+    rows.push([a.id,(GRP_CLR[(a.grp||1)-1]||{}).name||('G'+(a.grp||1)),Math.round(mv),Math.round(hd),Math.round(id),den>0?Math.round(act/den*100):0]);});
+  const csv='﻿'+rows.map(r=>r.map(q).join(',')).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`results-${R.line}-${ts.file}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  toast('已匯出 CSV','ok');
+}
+
+// ── 方案比較表（session 內累積，純呈現） ──
+let pinnedScenarios=[];
+function pinScenario(){
+  if(!selectedLine || (typeof abfPcs==='undefined') || abfPcs<=0){ toast('尚無結果可釘選','err'); return; }
+  const R=gatherResults();
+  const etaSec=(R.uph>0&&R.done<R.target)?(R.simT+(R.target-R.done)/R.uph*3600):(R.reached?R.simT:Infinity);
+  const label=(scnStore&&scnStore.active)?scnStore.active:R.line;
+  pinnedScenarios.push({label,done:R.done,uph:R.uph,etaSec,etaTxt:R.reached?'已達標':R.eta,
+    worst:R.worst?R.worst.name:'—',avgUtil:Math.round(R.avgUtil*100)});
+  if(document.getElementById('cmp-table-ov').classList.contains('show')) renderComparisonTable();
+}
+function removePinned(i){ pinnedScenarios.splice(i,1); renderComparisonTable(); }
+function openComparison(){ const ov=document.getElementById('cmp-table-ov'); ov.classList.add('show'); renderComparisonTable(); trapFocus(ov.querySelector('.ctx')); }
+function closeComparison(){ document.getElementById('cmp-table-ov').classList.remove('show'); releaseFocus(); }
+function renderComparisonTable(){
+  const el=document.getElementById('cmp-table-body'); if(!el) return;
+  const PS=pinnedScenarios;
+  if(!PS.length){ el.innerHTML='<div class="empty">尚無釘選方案。先跑一次模擬，再按「📌 釘選目前結果」。</div>'; return; }
+  const bestUph=Math.max(...PS.map(p=>p.uph)), bestDone=Math.max(...PS.map(p=>p.done)), bestEta=Math.min(...PS.map(p=>p.etaSec));
+  const cols=PS.map((p,i)=>`<th>${p.label}<br><span class="rmcol" onclick="removePinned(${i})" title="移除">✕ 移除</span></th>`).join('');
+  const row=(name,fn)=>`<tr><td>${name}</td>${PS.map(fn).join('')}</tr>`;
+  el.innerHTML=`<table><thead><tr><th>指標</th>${cols}</tr></thead><tbody>`
+    +row('完成片數',p=>`<td class="${p.done===bestDone?'best':''}">${nf(p.done)}</td>`)
+    +row('平均 UPH',p=>`<td class="${p.uph===bestUph?'best':''}">${nf(p.uph)}</td>`)
+    +row('達標 ETA',p=>`<td class="${(p.etaSec===bestEta&&isFinite(p.etaSec))?'best':''}">${p.etaTxt}</td>`)
+    +row('最重瓶頸',p=>`<td>${p.worst}</td>`)
+    +row('平均 AGV 稼動',p=>`<td>${p.avgUtil}%</td>`)
+    +`</tbody></table>`;
+}
+
+// ── 瓶頸建議（由既有瓶頸偵測反推設備數） ──
+function renderAdvice(piles){
+  const el=document.getElementById('bnk-advice'); if(!el) return;
+  if(!piles||!piles.length){ el.innerHTML=''; return; }
+  const s=piles[0], bp=BLUEPRINTS[selectedLine];
+  const col=(bp&&bp.spine)?bp.spine.find(c=>c.xi===s.xi&&c.countKey):null;
+  const nm=s.name.replace(/_\d+$/,'');
+  let html=`<div style="margin-top:6px;font-size:11px;color:var(--dim);line-height:1.5">💡 <b>${nm}</b> 為主要瓶頸（出口堆積 ${Math.round(s.pileT)}s）。`;
+  if(col){ const cur=clampInt(P[col.countKey],1,9);
+    if(cur<9){ html+=`可試：機台數 ${cur}→${cur+1} 後重跑。</div>`
+      +`<button class="mini" style="margin-top:4px;width:100%" onclick="applyBottleneckAdvice('${col.countKey}')">套用 +1 並重跑</button>`; }
+    else html+=`機台數已達上限（${cur}）。</div>`;
+  } else html+=`建議檢視該站前後段配置。</div>`;
+  el.innerHTML=html;
+}
+function applyBottleneckAdvice(key){
+  const el=document.getElementById('p-'+key); const cur=clampInt(P[key],1,9);
+  if(cur>=9){ toast('機台數已達上限','err'); return; }
+  if(el) el.value=cur+1; else { toast('找不到對應參數欄位','err'); return; }
+  applyP();                                   // 偵測為需重跑 → 重置重播 + 顯示前後比較卡
+  toast(`已將${key} +1 並重跑`,'ok');
+}
 // 即時變更時間軸註記（保留可追溯性）
 function markLiveChange(summary){
   liveMarks.push(`${fmt(simT).slice(3)} ${summary}`);
@@ -2409,9 +2719,9 @@ function renderLineSelect(){
     wrap.appendChild(b);
     if(bp.custom){
       const t=document.createElement('div'); t.className='line-card-tools';
-      t.innerHTML=`<button title="編輯" onclick="event.stopPropagation();openWizard('${id}')">✎</button>`
-        +`<button title="匯出" onclick="event.stopPropagation();exportBlueprint('${id}')">⬇</button>`
-        +`<button class="rst" title="刪除" onclick="event.stopPropagation();wzDelete('${id}')">🗑</button>`;
+      t.innerHTML=`<button title="編輯" aria-label="編輯製程線" onclick="event.stopPropagation();openWizard('${id}')">✎</button>`
+        +`<button title="匯出" aria-label="匯出製程線" onclick="event.stopPropagation();exportBlueprint('${id}')">⬇</button>`
+        +`<button class="rst" title="刪除" aria-label="刪除製程線" onclick="event.stopPropagation();wzDelete('${id}')">🗑</button>`;
       wrap.appendChild(t);
     }
     box.appendChild(wrap);
@@ -2429,10 +2739,11 @@ function renderLineSelect(){
   box.appendChild(imp);
 }
 // 刪除自訂線（含確認）
-function wzDelete(id){
+async function wzDelete(id){
   const bp=BLUEPRINTS[id]; if(!bp) return;
-  if(!confirm(`確定刪除自訂線「${bp.name}」？`)) return;
+  if(!await confirmDialog(`確定刪除自訂線「${bp.name}」？`)) return;
   deleteCustomLine(id); renderLineSelect();
+  toast(`已刪除「${bp.name}」`,'ok');
 }
 // 匯入 blueprint 檔
 function importLineFile(e){
@@ -2443,9 +2754,9 @@ function importLineFile(e){
       const obj=JSON.parse(ev.target.result);
       const bp=obj.blueprint||obj;
       const res=addCustomLine(bp);
-      if(res.ok){ renderLineSelect(); renderParamPanel(); alert(res.msg); }
-      else alert('匯入失敗：\n'+res.msg);
-    }catch(_){ alert('JSON 格式錯誤'); }
+      if(res.ok){ renderLineSelect(); renderParamPanel(); toast(res.msg,'ok'); }
+      else toast('匯入失敗：'+res.msg,'err');
+    }catch(_){ toast('JSON 格式錯誤','err'); }
     e.target.value='';
   };
   r.readAsText(file);
@@ -2480,9 +2791,10 @@ function openWizard(editId){
   document.getElementById('wz-pick').value=wizState.pick;
   document.getElementById('wz-drop').value=wizState.drop;
   renderWizStations(); renderWizGroups(); setWzMsg('');
-  document.getElementById('line-wizard').classList.add('show');
+  const wzo=document.getElementById('line-wizard'); wzo.classList.add('show');
+  trapFocus(wzo.querySelector('.wz'));
 }
-function closeWizard(){ document.getElementById('line-wizard').classList.remove('show'); }
+function closeWizard(){ document.getElementById('line-wizard').classList.remove('show'); releaseFocus(); }
 function setWzMsg(m,cls){ const el=document.getElementById('wz-msg'); if(el){ el.textContent=m||''; el.className=cls||''; } }
 function wzReadBasics(){
   wizState.name=document.getElementById('wz-name').value.trim();
@@ -2576,7 +2888,7 @@ function wzSave(){
   const res=addCustomLine(bp);
   if(!res.ok){ if(wizState.editId) loadCustomLines(); setWzMsg(res.msg,'err'); return; }
   closeWizard(); renderLineSelect(); renderParamPanel();
-  alert(res.msg);
+  toast(res.msg,'ok');
 }
 function selectLine(line){
   selectedLine = line;
@@ -2593,6 +2905,7 @@ function selectLine(line){
   if(_ul) _ul.textContent=((BLUEPRINTS[line]&&BLUEPRINTS[line].name)||line)+' UPH';
   document.getElementById('bnk-section').style.display = ''; // PORT 堆積瓶頸對兩線皆適用
   initSim();
+  maybeShowCoach();  // 首次進入模擬顯示操作提示（之後記住不再自動出現）
 }
 
 function backToSelect(){
@@ -2603,9 +2916,90 @@ function backToSelect(){
   document.getElementById('ov').classList.remove('show');
 }
 
+// ══════════════════════════════════════════════════════════════
+// UX 基礎建設：toast / confirm / 主題 / 鍵盤捷徑
+// ══════════════════════════════════════════════════════════════
+// Inline toast：取代 alert，不阻塞
+function toast(msg,type='info'){
+  const host=document.getElementById('toast-host'); if(!host) return;
+  const t=document.createElement('div'); t.className='toast '+(type==='ok'?'ok':type==='err'?'err':'');
+  t.textContent=msg; host.appendChild(t);
+  requestAnimationFrame(()=>t.classList.add('show'));
+  const dur=type==='err'?5200:3200;
+  setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),280); },dur);
+}
+// 螢幕報讀器里程碑播報（只在事件性里程碑呼叫，不綁每秒更新）
+function announce(msg){ const el=document.getElementById('sr-live'); if(!el) return; el.textContent=''; setTimeout(()=>{el.textContent=msg;},30); }
+// Inline 確認彈窗：回傳 Promise<boolean>
+function confirmDialog(msg){
+  return new Promise(resolve=>{
+    const ov=document.getElementById('confirm-ov');
+    const ok=document.getElementById('confirm-ok'), cancel=document.getElementById('confirm-cancel');
+    document.getElementById('confirm-msg').textContent=msg;
+    ov.classList.add('show');
+    trapFocus(ov.querySelector('.cbx'));
+    const done=v=>{ ov.classList.remove('show'); ok.onclick=null; cancel.onclick=null; ov._onEsc=null; releaseFocus(); resolve(v); };
+    ok.onclick=()=>done(true);
+    cancel.onclick=()=>done(false);
+    ov._onEsc=()=>done(false);        // Esc=取消（由全域 keydown 觸發）
+    ok.focus();
+  });
+}
+// 深色／淺色主題（預設淺色、記憶於 localStorage）
+function applyTheme(theme){
+  const dark=theme==='dark';
+  document.documentElement.dataset.theme=dark?'dark':'light';
+  const btn=document.getElementById('btn-theme');
+  if(btn){ btn.textContent=dark?'☀ 淺色':'🌙 深色';
+    btn.setAttribute('aria-label',dark?'切換為淺色主題':'切換為深色主題'); }
+}
+function toggleTheme(){
+  const next=document.documentElement.dataset.theme==='dark'?'light':'dark';
+  try{ localStorage.setItem('sim-theme',next); }catch(_){}
+  applyTheme(next);
+  announce(next==='dark'?'已切換深色主題':'已切換淺色主題');
+}
+function initTheme(){
+  let t='light'; try{ t=localStorage.getItem('sim-theme')||'light'; }catch(_){}
+  applyTheme(t);
+}
+// 全域鍵盤捷徑（輸入聚焦時讓路，僅 Esc 例外）
+function setupKeyboard(){
+  document.addEventListener('keydown',e=>{
+    const a=document.activeElement;
+    const typing=a&&(a.tagName==='INPUT'||a.tagName==='SELECT'||a.tagName==='TEXTAREA'||a.isContentEditable);
+    if(e.key==='Escape'){
+      // 確認彈窗優先
+      const cov=document.getElementById('confirm-ov');
+      if(cov&&cov.classList.contains('show')){ if(cov._onEsc)cov._onEsc(); return; }
+      if(document.getElementById('line-wizard').classList.contains('show')){ closeWizard(); return; }
+      if(document.getElementById('cmp-table-ov').classList.contains('show')){ closeComparison(); return; }
+      if(agvBoardOpen){ toggleAgvBoard(); return; }
+      const ov=document.getElementById('ov');
+      if(ov.classList.contains('show')){ closeOv(); return; }
+      if(document.getElementById('sb').classList.contains('open')){ toggleSB(); return; }
+      return;
+    }
+    if(typing) return;                 // 打字中：不吃字元捷徑
+    // 選擇畫面時不啟用模擬捷徑
+    if(document.getElementById('sel-ov').style.display!=='none') return;
+    switch(e.key){
+      case ' ': case 'Spacebar': e.preventDefault(); togglePlay(); break;
+      case 'ArrowRight': e.preventDefault(); fastForward(); break;
+      case '1': setSpeed(1); break;
+      case '2': setSpeed(2); break;
+      case '5': setSpeed(5); break;
+      case 'r': case 'R': resetSim(); break;
+      case 'p': case 'P': toggleSB(); break;
+    }
+  });
+}
+
 // 公司 LOGO（擎添工業，SVG 向量）—— base64 內嵌，單檔自帶不依賴外部圖片
 const LOGO_SRC='data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+CjwhLS0gQ3JlYXRlZCB3aXRoIElua3NjYXBlIChodHRwOi8vd3d3Lmlua3NjYXBlLm9yZy8pIC0tPgoKPHN2ZwogICB3aWR0aD0iMzUwIgogICBoZWlnaHQ9IjE0MCIKICAgdmlld0JveD0iMCAwIDkyLjYwNDE2NCAzNy4wNDE2NjciCiAgIHZlcnNpb249IjEuMSIKICAgaWQ9InN2ZzEiCiAgIHNvZGlwb2RpOmRvY25hbWU9ImNoaW5nLXRlY2guc3ZnIgogICBpbmtzY2FwZTp2ZXJzaW9uPSIxLjQuMiAoMmFlYjYyM2UxZCwgMjAyNS0wNS0xMikiCiAgIHhtbDpzcGFjZT0icHJlc2VydmUiCiAgIGlua3NjYXBlOmV4cG9ydC1maWxlbmFtZT0ibWFzay1mYW51Yy5zdmciCiAgIGlua3NjYXBlOmV4cG9ydC14ZHBpPSI5NiIKICAgaW5rc2NhcGU6ZXhwb3J0LXlkcGk9Ijk2IgogICB4bWxuczppbmtzY2FwZT0iaHR0cDovL3d3dy5pbmtzY2FwZS5vcmcvbmFtZXNwYWNlcy9pbmtzY2FwZSIKICAgeG1sbnM6c29kaXBvZGk9Imh0dHA6Ly9zb2RpcG9kaS5zb3VyY2Vmb3JnZS5uZXQvRFREL3NvZGlwb2RpLTAuZHRkIgogICB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciCiAgIHhtbG5zOnN2Zz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxzb2RpcG9kaTpuYW1lZHZpZXcKICAgICBpZD0ibmFtZWR2aWV3MSIKICAgICBwYWdlY29sb3I9IiNmZmZmZmYiCiAgICAgYm9yZGVyY29sb3I9IiMwMDAwMDAiCiAgICAgYm9yZGVyb3BhY2l0eT0iMC4yNSIKICAgICBpbmtzY2FwZTpzaG93cGFnZXNoYWRvdz0iMiIKICAgICBpbmtzY2FwZTpwYWdlb3BhY2l0eT0iMC4wIgogICAgIGlua3NjYXBlOnBhZ2VjaGVja2VyYm9hcmQ9IjAiCiAgICAgaW5rc2NhcGU6ZGVza2NvbG9yPSIjZDFkMWQxIgogICAgIGlua3NjYXBlOmRvY3VtZW50LXVuaXRzPSJtbSIKICAgICBpbmtzY2FwZTp6b29tPSIxLjM0NjQ0OTIiCiAgICAgaW5rc2NhcGU6Y3g9IjE4NS4zMDIyMSIKICAgICBpbmtzY2FwZTpjeT0iMTEyLjUxODE3IgogICAgIGlua3NjYXBlOndpbmRvdy13aWR0aD0iMjU2MCIKICAgICBpbmtzY2FwZTp3aW5kb3ctaGVpZ2h0PSIxMzcxIgogICAgIGlua3NjYXBlOndpbmRvdy14PSIzMzYwIgogICAgIGlua3NjYXBlOndpbmRvdy15PSI2MTIiCiAgICAgaW5rc2NhcGU6d2luZG93LW1heGltaXplZD0iMSIKICAgICBpbmtzY2FwZTpjdXJyZW50LWxheWVyPSJsYXllcjEiCiAgICAgc2hvd2dyaWQ9ImZhbHNlIiAvPjxkZWZzCiAgICAgaWQ9ImRlZnMxIj48bGluZWFyR3JhZGllbnQKICAgaWQ9InN3YXRjaDE0IgogICBpbmtzY2FwZTpzd2F0Y2g9InNvbGlkIj48c3RvcAogICAgIHN0eWxlPSJzdG9wLWNvbG9yOiNmZmUwMWE7c3RvcC1vcGFjaXR5OjE7IgogICAgIG9mZnNldD0iMCIKICAgICBpZD0ic3RvcDE0IiAvPjwvbGluZWFyR3JhZGllbnQ+CgkKCgkJCgkJCgkJCgkJCgkJCgkJCgkJCgkJCgk8ZmlsdGVyCiAgIGlua3NjYXBlOmNvbGxlY3Q9ImFsd2F5cyIKICAgc3R5bGU9ImNvbG9yLWludGVycG9sYXRpb24tZmlsdGVyczpzUkdCIgogICBpZD0iZmlsdGVyMzQiCiAgIHg9Ii0wLjAwNDAxNDUwMjUiCiAgIHk9Ii0wLjAxNzAxMDUwNCIKICAgd2lkdGg9IjEuMDA4MDI5IgogICBoZWlnaHQ9IjEuMDM0MDIxIj48ZmVHYXVzc2lhbkJsdXIKICAgICBpbmtzY2FwZTpjb2xsZWN0PSJhbHdheXMiCiAgICAgc3RkRGV2aWF0aW9uPSIwLjA1NjI1ODY5IgogICAgIGlkPSJmZUdhdXNzaWFuQmx1cjM0IiAvPjwvZmlsdGVyPjxmaWx0ZXIKICAgaW5rc2NhcGU6Y29sbGVjdD0iYWx3YXlzIgogICBzdHlsZT0iY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzOnNSR0IiCiAgIGlkPSJmaWx0ZXIzNSIKICAgeD0iLTAuMDAzMzk3MzUwNiIKICAgeT0iLTAuMDE3MDEwNTAxIgogICB3aWR0aD0iMS4wMDY3OTQ3IgogICBoZWlnaHQ9IjEuMDM0MDIxIj48ZmVHYXVzc2lhbkJsdXIKICAgICBpbmtzY2FwZTpjb2xsZWN0PSJhbHdheXMiCiAgICAgc3RkRGV2aWF0aW9uPSIwLjA1NjI1ODY5IgogICAgIGlkPSJmZUdhdXNzaWFuQmx1cjM1IiAvPjwvZmlsdGVyPjxmaWx0ZXIKICAgaW5rc2NhcGU6Y29sbGVjdD0iYWx3YXlzIgogICBzdHlsZT0iY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzOnNSR0IiCiAgIGlkPSJmaWx0ZXIzNiIKICAgeD0iLTAuMDA2Mzc4OTM3OSIKICAgeT0iLTAuMDA2Mzc4OTM4MiIKICAgd2lkdGg9IjEuMDEyNzU3OSIKICAgaGVpZ2h0PSIxLjAxMjc1NzkiPjxmZUdhdXNzaWFuQmx1cgogICAgIGlua3NjYXBlOmNvbGxlY3Q9ImFsd2F5cyIKICAgICBzdGREZXZpYXRpb249IjAuMDU2MjU4NjkiCiAgICAgaWQ9ImZlR2F1c3NpYW5CbHVyMzYiIC8+PC9maWx0ZXI+PC9kZWZzPjxnCiAgICAgaW5rc2NhcGU6bGFiZWw9IkxheWVyIDEiCiAgICAgaW5rc2NhcGU6Z3JvdXBtb2RlPSJsYXllciIKICAgICBpZD0ibGF5ZXIxIj48cGF0aAogICAgICAgZmlsbD0iI2RkZGRkZCIKICAgICAgIGQ9Im0gMzEuNzUsMTguNTIwODMzIGMgMCw1Ljg0NTA0NyAtNC43MzgzMzEsMTAuNTgzMzMzIC0xMC41ODMxMTQsMTAuNTgzMzMzIC01Ljg0NTIyMiwwIC0xMC41ODM1NTMsLTQuNzM4Mjg2IC0xMC41ODM1NTMsLTEwLjU4MzMzMyAwLC01Ljg0NTA0NiA0LjczODMzMSwtMTAuNTgzMzMzIDEwLjU4MzUwOSwtMTAuNTgzMzMzIDUuODQ0ODI3LDAgMTAuNTgzMTU4LDQuNzM4Mjg3IDEwLjU4MzE1OCwxMC41ODMzMzMgeiIKICAgICAgIGlkPSJwYXRoMzUiCiAgICAgICBzdHlsZT0iZmlsbDojMTcxYzYxO2ZpbGwtb3BhY2l0eToxO3N0cm9rZS13aWR0aDowLjA0MzkyNDM7ZmlsdGVyOnVybCgjZmlsdGVyMzYpIiAvPjx0ZXh0CiAgICAgICB4bWw6c3BhY2U9InByZXNlcnZlIgogICAgICAgc3R5bGU9ImZvbnQtc3R5bGU6bm9ybWFsO2ZvbnQtdmFyaWFudDpub3JtYWw7Zm9udC13ZWlnaHQ6bm9ybWFsO2ZvbnQtc3RyZXRjaDpub3JtYWw7Zm9udC1zaXplOjcuOTM3NXB4O2ZvbnQtZmFtaWx5OidOb3RvIFNhbnMnOy1pbmtzY2FwZS1mb250LXNwZWNpZmljYXRpb246J05vdG8gU2FucywgTm9ybWFsJztmb250LXZhcmlhbnQtbGlnYXR1cmVzOm5vcm1hbDtmb250LXZhcmlhbnQtY2Fwczpub3JtYWw7Zm9udC12YXJpYW50LW51bWVyaWM6bm9ybWFsO2ZvbnQtdmFyaWFudC1lYXN0LWFzaWFuOm5vcm1hbDt0ZXh0LWFsaWduOnN0YXJ0O3dyaXRpbmctbW9kZTpsci10YjtkaXJlY3Rpb246bHRyO3RleHQtYW5jaG9yOnN0YXJ0O2Rpc3BsYXk6aW5saW5lO21peC1ibGVuZC1tb2RlOm5vcm1hbDtmaWxsOiMxNzFjNjE7ZmlsbC1vcGFjaXR5OjE7c3Ryb2tlLXdpZHRoOjExLjQ4NzU7ZmlsdGVyOnVybCgjZmlsdGVyMzUpIgogICAgICAgeD0iMzkuMjAzNDA3IgogICAgICAgeT0iMTUuMjkyOTAzIgogICAgICAgaWQ9InRleHQzNSI+PHRzcGFuCiAgICAgICAgIHNvZGlwb2RpOnJvbGU9ImxpbmUiCiAgICAgICAgIGlkPSJ0c3BhbjM1IgogICAgICAgICBzdHlsZT0iZm9udC1zdHlsZTpub3JtYWw7Zm9udC12YXJpYW50Om5vcm1hbDtmb250LXdlaWdodDpub3JtYWw7Zm9udC1zdHJldGNoOm5vcm1hbDtmb250LXNpemU6Ny45Mzc1cHg7Zm9udC1mYW1pbHk6J05vdG8gU2Fucyc7LWlua3NjYXBlLWZvbnQtc3BlY2lmaWNhdGlvbjonTm90byBTYW5zLCBOb3JtYWwnO2ZvbnQtdmFyaWFudC1saWdhdHVyZXM6bm9ybWFsO2ZvbnQtdmFyaWFudC1jYXBzOm5vcm1hbDtmb250LXZhcmlhbnQtbnVtZXJpYzpub3JtYWw7Zm9udC12YXJpYW50LWVhc3QtYXNpYW46bm9ybWFsO2ZpbGw6IzE3MWM2MTtmaWxsLW9wYWNpdHk6MTtzdHJva2Utd2lkdGg6MTEuNDg3NSIKICAgICAgICAgeD0iMzkuMjAzNDA3IgogICAgICAgICB5PSIxNS4yOTI5MDMiPkNoaW5nIFRlY2g8L3RzcGFuPjwvdGV4dD48dGV4dAogICAgICAgeG1sOnNwYWNlPSJwcmVzZXJ2ZSIKICAgICAgIHN0eWxlPSJmb250LXN0eWxlOm5vcm1hbDtmb250LXZhcmlhbnQ6bm9ybWFsO2ZvbnQtd2VpZ2h0Om5vcm1hbDtmb250LXN0cmV0Y2g6bm9ybWFsO2ZvbnQtc2l6ZTo4LjU5OTY3cHg7Zm9udC1mYW1pbHk6J05vdG8gU2FucyBUQyc7LWlua3NjYXBlLWZvbnQtc3BlY2lmaWNhdGlvbjonTm90byBTYW5zIFRDLCBAd2dodD00MDAnO2ZvbnQtdmFyaWFudC1saWdhdHVyZXM6bm9ybWFsO2ZvbnQtdmFyaWFudC1jYXBzOm5vcm1hbDtmb250LXZhcmlhbnQtbnVtZXJpYzpub3JtYWw7Zm9udC12YXJpYW50LWVhc3QtYXNpYW46bm9ybWFsO2ZvbnQtdmFyaWF0aW9uLXNldHRpbmdzOid3Z2h0JyA0MDA7dGV4dC1hbGlnbjpzdGFydDt3cml0aW5nLW1vZGU6bHItdGI7ZGlyZWN0aW9uOmx0cjt0ZXh0LWFuY2hvcjpzdGFydDtkaXNwbGF5OmlubGluZTttaXgtYmxlbmQtbW9kZTpub3JtYWw7ZmlsbDojMTcxYzYxO2ZpbGwtb3BhY2l0eToxO3N0cm9rZS13aWR0aDoxMi40NDU4O2ZpbHRlcjp1cmwoI2ZpbHRlcjM0KSIKICAgICAgIHg9IjQzLjQwNjk1MiIKICAgICAgIHk9IjI3LjA5MzM1OSIKICAgICAgIGlkPSJ0ZXh0MzQiPjx0c3BhbgogICAgICAgICBzb2RpcG9kaTpyb2xlPSJsaW5lIgogICAgICAgICBpZD0idHNwYW4zNCIKICAgICAgICAgc3R5bGU9ImZvbnQtc3R5bGU6bm9ybWFsO2ZvbnQtdmFyaWFudDpub3JtYWw7Zm9udC13ZWlnaHQ6bm9ybWFsO2ZvbnQtc3RyZXRjaDpub3JtYWw7Zm9udC1zaXplOjguNTk5NjdweDtmb250LWZhbWlseTonTm90byBTYW5zIFRDJzstaW5rc2NhcGUtZm9udC1zcGVjaWZpY2F0aW9uOidOb3RvIFNhbnMgVEMsIEB3Z2h0PTQwMCc7Zm9udC12YXJpYW50LWxpZ2F0dXJlczpub3JtYWw7Zm9udC12YXJpYW50LWNhcHM6bm9ybWFsO2ZvbnQtdmFyaWFudC1udW1lcmljOm5vcm1hbDtmb250LXZhcmlhbnQtZWFzdC1hc2lhbjpub3JtYWw7Zm9udC12YXJpYXRpb24tc2V0dGluZ3M6J3dnaHQnIDQwMDtmaWxsOiMxNzFjNjE7ZmlsbC1vcGFjaXR5OjE7c3Ryb2tlLXdpZHRoOjEyLjQ0NTgiCiAgICAgICAgIHg9IjQzLjQwNjk1MiIKICAgICAgICAgeT0iMjcuMDkzMzU5Ij7mk47mt7vlt6Xmpa08L3RzcGFuPjwvdGV4dD48cGF0aAogICAgICAgZmlsbD0iI2RkZGRkZCIKICAgICAgIGQ9Im0gMzEuNzUsMTguNTIwODMzIGMgMCw1Ljg0NTA0NyAtNC43MzgzMzEsMTAuNTgzMzMzIC0xMC41ODMxMTQsMTAuNTgzMzMzIC01Ljg0NTIyMiwwIC0xMC41ODM1NTMsLTQuNzM4Mjg2IC0xMC41ODM1NTMsLTEwLjU4MzMzMyAwLC01Ljg0NTA0NiA0LjczODMzMSwtMTAuNTgzMzMzIDEwLjU4MzUwOSwtMTAuNTgzMzMzIDUuODQ0ODI3LDAgMTAuNTgzMTU4LDQuNzM4Mjg3IDEwLjU4MzE1OCwxMC41ODMzMzMgeiIKICAgICAgIGlkPSJwYXRoMS0wIgogICAgICAgc3R5bGU9InN0cm9rZS13aWR0aDowLjA0MzkyNDMiIC8+PHBhdGgKICAgICAgIGZpbGw9IiM3ZWJlZTMiCiAgICAgICBkPSJtIDIxLjE2NjQ5MSwxOC41MjA4MzMgLTEwLjU4MzExNCwtMy45NWUtNCBjIDAsNS44NDU0NDIgNC43MzgzMzEsMTAuNTgzNzI4IDEwLjU4MzUwOSwxMC41ODM3MjggeiIKICAgICAgIGlkPSJwYXRoMi0zIgogICAgICAgc3R5bGU9InN0cm9rZS13aWR0aDowLjA0MzkyNDMiIC8+PHBhdGgKICAgICAgIGZpbGw9IiM3ZWJlZTMiCiAgICAgICBkPSJNIDIxLjE2Njg0MiwxOC41MjA4MzMgSCAzMS43NDk5NTYgQyAzMS43NDk5NTYsMTIuNjc1Nzg3IDI3LjAxMTYyNSw3LjkzNzUgMjEuMTY2NDQ3LDcuOTM3NSBaIgogICAgICAgaWQ9InBhdGgzLTAiCiAgICAgICBzdHlsZT0ic3Ryb2tlLXdpZHRoOjAuMDQzOTI0MyIgLz48cGF0aAogICAgICAgZmlsbD0iI2RkZGRkZCIKICAgICAgIGQ9Im0gMjcuODUxMDE4LDE4LjUyMDgzMyBjIDAsMy42OTIwNTUgLTIuOTkyODY4LDYuNjg0MDg4IC02LjY4NDU3MSw2LjY4NDA4OCAtMy42OTEzMDgsMCAtNi42ODQxNzYsLTIuOTkyMDMzIC02LjY4NDE3NiwtNi42ODQwODggMCwtMy42OTE2NTkgMi45OTI4NjgsLTYuNjg0MDg4IDYuNjg0MTc2LC02LjY4NDA4OCAzLjY5MTcwMywwIDYuNjg0NTcxLDIuOTkyNDI5IDYuNjg0NTcxLDYuNjg0MDg4IHoiCiAgICAgICBpZD0icGF0aDQtNCIKICAgICAgIHN0eWxlPSJzdHJva2Utd2lkdGg6MC4wNDM5MjQzIiAvPjxwYXRoCiAgICAgICBmaWxsPSIjMWQ5NmQ1IgogICAgICAgZD0ibSAyMS4xNjY4NDIsMTguNTIwODMzIC0zLjk1ZS00LC02LjY4NDA4OCBjIC0zLjY5MTMwOCwwIC02LjY4NDE3NiwyLjk5MjQyOSAtNi42ODQxNzYsNi42ODQwODggeiIKICAgICAgIGlkPSJwYXRoNS00IgogICAgICAgc3R5bGU9InN0cm9rZS13aWR0aDowLjA0MzkyNDMiIC8+PHBhdGgKICAgICAgIGZpbGw9IiMxZDk2ZDUiCiAgICAgICBkPSJtIDIxLjE2NjQ5MSwxOC41MjA4MzMgMy45NWUtNCw2LjY4NDA4OCBjIDMuNjkxNzQ3LDAgNi42ODQxNzYsLTIuOTkyMDMzIDYuNjg0MTc2LC02LjY4NDA4OCB6IgogICAgICAgaWQ9InBhdGg2LTQiCiAgICAgICBzdHlsZT0ic3Ryb2tlLXdpZHRoOjAuMDQzOTI0MyIKICAgICAgIGlua3NjYXBlOmxhYmVsPSJwYXRoNi00IiAvPjxwYXRoCiAgICAgICBmaWxsPSIjMWMyYTU0IgogICAgICAgZD0ibSAxOC4wODg0MSwyMC45NzE3MiB2IC00LjkwMTc3MyBjIDAuOTIzMDI0LDAgMS43MjU5NiwwLjUxMDQ0NCAyLjE0Mzg5OSwxLjI2NDE4NCBsIDAuNDM4MzIxLC0wLjI0Mjk0NSBjIC0wLjUwMzU0OCwtMC45MDc2NTEgLTEuNDcwNjczLC0xLjUyMjQ1OSAtMi41ODIxNzYsLTEuNTIyNDU5IC0xLjYzMDMzNywwIC0yLjk1MjE1MSwxLjMyMTc2OSAtMi45NTIxNTEsMi45NTIxMDYgMCwxLjYzMDMzNyAxLjMyMTgxNCwyLjk1MjEwNiAyLjk1MjE1MSwyLjk1MjEwNiAxLjExMTUwMywwIDIuMDc4NjI4LC0wLjYxNDgwOCAyLjU4MjE3NiwtMS41MjI0NTkgTCAyMC4yMzIzMDksMTkuNzA3NTM1IEMgMTkuODE0MzcsMjAuNDYxMjc2IDE5LjAxMTQzNCwyMC45NzE3MiAxOC4wODg0MSwyMC45NzE3MiBaIgogICAgICAgaWQ9InBhdGg3LTQiCiAgICAgICBzdHlsZT0iZmlsbDojMTcxYzYxO2ZpbGwtb3BhY2l0eToxO3N0cm9rZS13aWR0aDowLjA0MzkyNDMiIC8+PHBvbHlnb24KICAgICAgIGZpbGw9IiMxYzJhNTQiCiAgICAgICBwb2ludHM9IjM4OC4yMzIsMTg4Ljc5MSAyNjAuNzMxLDE4OC43OTEgMjYwLjczMSwyMDAuMTUgMjk3LjA4LDIwMC4xNSAyOTcuMDgsMzIzLjIwOSAzNTEuMzI0LDMyMy4yMDkgMzUxLjMyNCwyMDAuMTUgMzg4LjIzMiwyMDAuMTUgIgogICAgICAgaWQ9InBvbHlnb243IgogICAgICAgdHJhbnNmb3JtPSJtYXRyaXgoMC4wNDM5MjQyNywwLDAsMC4wNDM5MjQyNyw5LjkyMjA1MzQsNy4yNzYyMjAxKSIKICAgICAgIHN0eWxlPSJmaWxsOiMxNzFjNjE7ZmlsbC1vcGFjaXR5OjEiIC8+PHRleHQKICAgICAgIHhtbDpzcGFjZT0icHJlc2VydmUiCiAgICAgICBzdHlsZT0iZm9udC1zdHlsZTpub3JtYWw7Zm9udC12YXJpYW50Om5vcm1hbDtmb250LXdlaWdodDpub3JtYWw7Zm9udC1zdHJldGNoOm5vcm1hbDtmb250LXNpemU6Ny45Mzc1cHg7Zm9udC1mYW1pbHk6J05vdG8gU2Fucyc7LWlua3NjYXBlLWZvbnQtc3BlY2lmaWNhdGlvbjonTm90byBTYW5zLCBOb3JtYWwnO2ZvbnQtdmFyaWFudC1saWdhdHVyZXM6bm9ybWFsO2ZvbnQtdmFyaWFudC1jYXBzOm5vcm1hbDtmb250LXZhcmlhbnQtbnVtZXJpYzpub3JtYWw7Zm9udC12YXJpYW50LWVhc3QtYXNpYW46bm9ybWFsO3RleHQtYWxpZ246c3RhcnQ7d3JpdGluZy1tb2RlOmxyLXRiO2RpcmVjdGlvbjpsdHI7dGV4dC1hbmNob3I6c3RhcnQ7ZmlsbDojMTcxYzYxO2ZpbGwtb3BhY2l0eToxO3N0cm9rZS13aWR0aDoxMS40ODc1IgogICAgICAgeD0iMzkuMjAzMzIiCiAgICAgICB5PSIxNS4yOTI5MDMiCiAgICAgICBpZD0idGV4dDEiCiAgICAgICBpbmtzY2FwZTpsYWJlbD0iQ2hpbmcgVGVjaCI+PHRzcGFuCiAgICAgICAgIHNvZGlwb2RpOnJvbGU9ImxpbmUiCiAgICAgICAgIGlkPSJ0c3BhbjEiCiAgICAgICAgIHN0eWxlPSJmb250LXN0eWxlOm5vcm1hbDtmb250LXZhcmlhbnQ6bm9ybWFsO2ZvbnQtd2VpZ2h0Om5vcm1hbDtmb250LXN0cmV0Y2g6bm9ybWFsO2ZvbnQtc2l6ZTo3LjkzNzVweDtmb250LWZhbWlseTonTm90byBTYW5zJzstaW5rc2NhcGUtZm9udC1zcGVjaWZpY2F0aW9uOidOb3RvIFNhbnMsIE5vcm1hbCc7Zm9udC12YXJpYW50LWxpZ2F0dXJlczpub3JtYWw7Zm9udC12YXJpYW50LWNhcHM6bm9ybWFsO2ZvbnQtdmFyaWFudC1udW1lcmljOm5vcm1hbDtmb250LXZhcmlhbnQtZWFzdC1hc2lhbjpub3JtYWw7ZmlsbDojMTcxYzYxO2ZpbGwtb3BhY2l0eToxO3N0cm9rZS13aWR0aDoxMS40ODc1IgogICAgICAgICB4PSIzOS4yMDMzMiIKICAgICAgICAgeT0iMTUuMjkyOTAzIj5DaGluZyBUZWNoPC90c3Bhbj48L3RleHQ+PHRleHQKICAgICAgIHhtbDpzcGFjZT0icHJlc2VydmUiCiAgICAgICBzdHlsZT0iZm9udC1zdHlsZTpub3JtYWw7Zm9udC12YXJpYW50Om5vcm1hbDtmb250LXdlaWdodDpub3JtYWw7Zm9udC1zdHJldGNoOm5vcm1hbDtmb250LXNpemU6OC41OTk2N3B4O2ZvbnQtZmFtaWx5OidOb3RvIFNhbnMgVEMnOy1pbmtzY2FwZS1mb250LXNwZWNpZmljYXRpb246J05vdG8gU2FucyBUQywgQHdnaHQ9NDAwJztmb250LXZhcmlhbnQtbGlnYXR1cmVzOm5vcm1hbDtmb250LXZhcmlhbnQtY2Fwczpub3JtYWw7Zm9udC12YXJpYW50LW51bWVyaWM6bm9ybWFsO2ZvbnQtdmFyaWFudC1lYXN0LWFzaWFuOm5vcm1hbDtmb250LXZhcmlhdGlvbi1zZXR0aW5nczond2dodCcgNDAwO3RleHQtYWxpZ246c3RhcnQ7d3JpdGluZy1tb2RlOmxyLXRiO2RpcmVjdGlvbjpsdHI7dGV4dC1hbmNob3I6c3RhcnQ7ZmlsbDojMTcxYzYxO2ZpbGwtb3BhY2l0eToxO3N0cm9rZS13aWR0aDoxMi40NDU4IgogICAgICAgeD0iNDMuNDA2ODY0IgogICAgICAgeT0iMjcuMDkzMjc1IgogICAgICAgaWQ9InRleHQxMiIKICAgICAgIGlua3NjYXBlOmxhYmVsPSLmk47mt7vlt6Xmpa0iPjx0c3BhbgogICAgICAgICBzb2RpcG9kaTpyb2xlPSJsaW5lIgogICAgICAgICBpZD0idHNwYW4xMiIKICAgICAgICAgc3R5bGU9ImZvbnQtc3R5bGU6bm9ybWFsO2ZvbnQtdmFyaWFudDpub3JtYWw7Zm9udC13ZWlnaHQ6bm9ybWFsO2ZvbnQtc3RyZXRjaDpub3JtYWw7Zm9udC1zaXplOjguNTk5NjdweDtmb250LWZhbWlseTonTm90byBTYW5zIFRDJzstaW5rc2NhcGUtZm9udC1zcGVjaWZpY2F0aW9uOidOb3RvIFNhbnMgVEMsIEB3Z2h0PTQwMCc7Zm9udC12YXJpYW50LWxpZ2F0dXJlczpub3JtYWw7Zm9udC12YXJpYW50LWNhcHM6bm9ybWFsO2ZvbnQtdmFyaWFudC1udW1lcmljOm5vcm1hbDtmb250LXZhcmlhbnQtZWFzdC1hc2lhbjpub3JtYWw7Zm9udC12YXJpYXRpb24tc2V0dGluZ3M6J3dnaHQnIDQwMDtmaWxsOiMxNzFjNjE7ZmlsbC1vcGFjaXR5OjE7c3Ryb2tlLXdpZHRoOjEyLjQ0NTgiCiAgICAgICAgIHg9IjQzLjQwNjg2NCIKICAgICAgICAgeT0iMjcuMDkzMjc1Ij7mk47mt7vlt6Xmpa08L3RzcGFuPjwvdGV4dD48L2c+PGcKICAgICBpbmtzY2FwZTpncm91cG1vZGU9ImxheWVyIgogICAgIGlkPSJsYXllcjIiCiAgICAgaW5rc2NhcGU6bGFiZWw9IkxheWVyIDIiIC8+PC9zdmc+Cg==';
 window.addEventListener('load',()=>{
+  initTheme();
+  setupKeyboard();
   initChart();
   const lh=document.getElementById('logo-hdr'), ls=document.getElementById('logo-sel');
   if(lh) lh.src=LOGO_SRC; if(ls) ls.src=LOGO_SRC;
