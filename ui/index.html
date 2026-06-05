@@ -2264,7 +2264,7 @@ function initChart(){
   chart=new Chart(document.getElementById('uc').getContext('2d'),{
     type:'line',
     data:{labels:[],datasets:[
-      {label:'UPH',data:[],borderColor:'#0a6ebd',backgroundColor:'rgba(10,110,189,.12)',tension:.3,pointRadius:2}
+      {label:'UPH',data:[],borderColor:'#0a6ebd',backgroundColor:'rgba(10,110,189,.12)',cubicInterpolationMode:'monotone',pointRadius:2}
     ]},
     options:{
       responsive:true,maintainAspectRatio:false,animation:false,
