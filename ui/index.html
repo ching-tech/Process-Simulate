@@ -264,6 +264,17 @@ html[data-theme=dark] #clk{color:var(--yellow)}
 .scard .sc .v.red{color:var(--red)}
 .scard .sc .v .u{font-size:12px;font-weight:400;color:var(--dim)}
 .ov-hint{font-size:12px;color:var(--dim);margin:2px 0 4px;line-height:1.5}
+/* 瓶頸明細（成績單內） */
+.bnk-detail{margin:8px 0;border:1px solid var(--border);border-radius:8px;padding:8px 10px;text-align:left;background:var(--card)}
+.bnk-detail .bd-h{font-size:12px;font-weight:600;color:var(--red);margin-bottom:5px}
+.bnk-detail .bd-row{padding:5px 0;border-top:1px solid var(--border)}
+.bnk-detail .bd-row:first-of-type{border-top:none}
+.bnk-detail .bd-top{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.bnk-detail .bd-n{font-weight:700;font-size:12.5px}
+.bnk-detail .bd-t{font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+.bnk-detail .bd-c{font-size:11px;margin-top:2px;line-height:1.4}
+.bnk-detail .c-agv{color:var(--orange)}
+.bnk-detail .c-st{color:var(--accent)}
 /* ── 上手引導 coachmark（浮動卡，不擋操作）── */
 #coach{position:fixed;left:18px;bottom:18px;z-index:330;background:var(--surface);border:1px solid var(--accent);border-left:4px solid var(--accent);border-radius:8px;padding:12px 14px;font-size:12px;max-width:300px;box-shadow:0 4px 20px #0004;display:none}
 #coach.show{display:block}
@@ -1080,15 +1091,60 @@ function updateABFMachines(dt){
     s.pendingFrames=s.pendingFrames.filter(t=>t>0);
   }
   // 瓶頸偵測：累計各站「出口滿框 / 退空框 / 緩衝滿載」滯留時間（PORT 堆積式）
-  for(const s of abfSt){ if(stPiled(s)) s.pileT=(s.pileT||0)+dt; else s.pileT=0; }
+  // pileT=當下連續堆積；pilePeak=整場最久一次；pileTotal=整場累計；pileCount=超過門檻的次數
+  for(let i=0;i<abfSt.length;i++){ const s=abfSt[i];
+    if(stPiled(s)){
+      s.pileT=(s.pileT||0)+dt;
+      s.pileTotal=(s.pileTotal||0)+dt;
+      if(s.pileT>(s.pilePeak||0)) s.pilePeak=s.pileT;
+      if(s.pileT>BNK_TH && !s._inBnk){ s._inBnk=true; s.pileCount=(s.pileCount||0)+1; const g=servingGroupForPile(i); s.pileGrp=g?g.grp:0; }
+    } else { s.pileT=0; s._inBnk=false; }
+  }
 }
-// 某站是否有料堆積在出口（下游或回收 AGV 沒及時取走）
+// 某站是否有「滿框（有產品）」堆積在出口（下游 AGV 沒及時取走）。
+// 只算滿框：退空框沒產品、其作用是讓前一站能繼續，不算產出瓶頸。
 function stPiled(s){
-  if(s.buf)               return s.fullAvail >= s.buf;        // 緩衝滿載
-  if(s.mtype==='refill')  return !!s.s_out;                   // 出滿框未取
-  if(s.mtype==='transfer')return !!s.out_full || !!s.in_ret;  // 出滿框/退空框未取
-  if(s.mtype==='changer') return !!s.in_ret;                  // 退空框未取
+  if(s.buf)               return s.fullAvail >= s.buf;   // 緩衝滿載（皆為滿框，有產品）
+  if(s.mtype==='refill')  return !!s.s_out;              // 出滿框未取（有產品）
+  if(s.mtype==='transfer')return !!s.out_full;           // 只算出滿框；退空框(in_ret)不算
+  if(s.mtype==='changer') return false;                  // 換框機僅有退空框 → 不計（其壅塞反映於上游出滿框堆積）
   return false;
+}
+// ── 瓶頸成因歸因：堆積站 → 服務它的 AGV 群組 → 該組稼動率 → 缺車 vs 下游塞住 ──
+function servingGroupForPile(i){
+  const s=abfSt[i]; if(!s||!LC.groups) return null;
+  const G=LC.groups;
+  if(s.buf)               return G.find(g=>g.mid===i)||null;               // 緩衝滿載 → 該緩衝所屬組
+  if(s.mtype==='changer') return G.find(g=>(g.dst||[]).includes(i))||null; // 退空框 → dst 組
+  if(s.mtype==='refill')  return G.find(g=>(g.src||[]).includes(i))||null; // 出滿框 → src 組
+  if(s.out_full) return G.find(g=>(g.src||[]).includes(i))||null;          // transfer 出滿框 → src 組
+  if(s.in_ret)   return G.find(g=>(g.dst||[]).includes(i))||null;          // transfer 退空框 → dst 組
+  return G.find(g=>(g.src||[]).includes(i))||null;
+}
+function groupUtil(grp){
+  let act=0,den=0;
+  for(const a of abfAGVs){ if(a.grp!==grp) continue; const m=a.tMove||0,h=a.tHandle||0,id=a.tIdle||0; act+=m+h; den+=m+h+id; }
+  return den>0?act/den:0;
+}
+const UTIL_HIGH=0.85; // 群組稼動率 ≥ 此 → 視為吃滿（缺車）
+// 診斷站別 i 的堆積成因 → {cause:'agv'|'downstream'|'unknown', grp, util, key, cur, text}
+function diagnoseBottleneck(i){
+  const s=abfSt[i]; if(!s) return {cause:'unknown',text:'—'};
+  const bp=BLUEPRINTS[LC.id]||{};
+  const g=(s.pileGrp?(LC.groups||[]).find(x=>x.grp===s.pileGrp):null)||servingGroupForPile(i);
+  if(!g) return {cause:'unknown', text:'建議檢視該站前後段配置'};
+  const util=groupUtil(g.grp), pct=Math.round(util*100), gname='G'+g.grp;
+  const agvKey=(bp.groups&&bp.groups[g.grp-1])?bp.groups[g.grp-1].agvKey:null;
+  if(util>=UTIL_HIGH && agvKey){
+    return {cause:'agv',grp:g.grp,util,key:agvKey,cur:clampInt(P[agvKey],1,9),
+      text:`服務的 ${gname} AGV 吃滿（稼動 ${pct}%）→ 缺車，建議該組 AGV +1`};
+  }
+  // 稼動率不高 → 非缺車：AGV 有餘裕卻仍堆積，瓶頸在該站本身節拍/設備（不臆測特定下游）
+  const nm=s.name.replace(/_\d+$/,'');
+  const col=(bp.spine||[]).find(c=>c.xi===s.xi&&c.countKey);
+  if(col){ return {cause:'station',grp:g.grp,util,key:col.countKey,cur:clampInt(P[col.countKey],1,9),
+      text:`服務的 ${gname} AGV 有餘裕（稼動 ${pct}%）→ 非缺車，瓶頸在 ${nm} 本身節拍/設備`}; }
+  return {cause:'station',grp:g.grp,util,text:`服務的 ${gname} AGV 有餘裕（稼動 ${pct}%）→ 非缺車，建議檢視 ${nm} 節拍/前後段`};
 }
 const BNK_TH=150; // 瓶頸判定門檻（秒）
 function setVitalsBnk(n){
@@ -1101,9 +1157,11 @@ function refreshBottleneck(){
   const piles=abfSt.filter(s=>(s.pileT||0)>BNK_TH).sort((a,b)=>(b.pileT||0)-(a.pileT||0));
   setVitalsBnk(piles.length);
   if(!piles.length){ bl.innerHTML='<div class="nob">目前無瓶頸</div>'; renderAdvice([]); _announcedBnk.clear(); return; }
-  bl.innerHTML=piles.map(s=>`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">`
+  bl.innerHTML=piles.map(s=>`<div style="margin-bottom:4px">`
+    +`<div style="display:flex;justify-content:space-between;align-items:center">`
     +`<span class="bb">堆積</span><span style="font-size:11px;margin:0 4px;flex:1">${s.name}</span>`
-    +`<span style="color:var(--red);font-size:12px;font-weight:bold">${Math.round(s.pileT)}s</span></div>`).join('');
+    +`<span style="color:var(--red);font-size:12px;font-weight:bold">${Math.round(s.pileT)}s</span></div>`
+    +`<div style="font-size:10px;color:var(--dim);margin-left:2px">峰值 ${Math.round(s.pilePeak||0)}s ｜ 累計 ${Math.round(s.pileTotal||0)}s ｜ ${s.pileCount||0} 次</div></div>`).join('');
   renderAdvice(piles);
   // 里程碑播報：僅對「新出現」的瓶頸站播一次（去重，不每幀念）
   for(const s of piles){ const k=s.name; if(!_announcedBnk.has(k)){ _announcedBnk.add(k); announce(`出現瓶頸：${s.name.replace(/_\d+$/,'')} 出口堆積`); break; } }
@@ -1166,9 +1224,13 @@ function stepABFAgv(agv, dt){
       const da=tABF(agv.pos,a.f), db=tABF(agv.pos,b.f);
       // 1. 就在取貨站（距離=0）優先 → 一放一取，不多跑
       if((da===0)!==(db===0)) return da===0?-1:1;
-      // 2. 再看任務優先度
+      // 2. 再看任務優先度（空框回送仍最高，先讓前一站能繼續）
       if(b.pri!==a.pri) return b.pri-a.pri;
-      // 3. 最後取距離最近
+      // 3. 先出先拿：同優先度的滿框，出來等越久者越優先（用該來源 pileT 當等待時間），避免遠端滿框被插隊餓死
+      const wa=a.c==='full'?(abfSt[a.f]?.pileT||0):0;
+      const wb=b.c==='full'?(abfSt[b.f]?.pileT||0):0;
+      if(wb!==wa) return wb-wa;
+      // 4. 最後才取距離最近
       return da-db;
     });
     for(const task of tasks){
@@ -1218,20 +1280,29 @@ function stepABFAgv(agv, dt){
 function resultScorecard(reached){
   const R=gatherResults();
   const done=R.done, avg=simT>0?Math.round(done/(simT/3600)):0;
-  const worst=R.worst?R.worst.name:'無';
-  const worstCls=R.worst?'red':'grn';
+  const w=R.worst, worstName=w?w.name:'無', worstCls=w?'red':'grn';
+  const worstSub=w?`<span class="u" style="display:block;font-size:11px;margin-top:2px">峰值 ${w.peak}s</span>`:'';
   const lastCell=reached
     ? `<div class="sc"><div class="k">達標狀態</div><div class="v grn" style="font-size:18px">✅ 已達標</div></div>`
     : `<div class="sc"><div class="k">預估達標</div><div class="v" style="font-size:17px">${R.eta||'—'}</div></div>`;
-  let hint='💡 想比較不同設備配置？按「📌 釘選」存起來，再開「📋 比較」並排看差異。';
-  if(R.worst) hint+=`<br>🔴 最重瓶頸在 <b>${worst}</b>，可開「統計圖表」查看增設建議。`;
+  // 瓶頸明細：依累計堆積排序，含峰值/次數與「缺車 vs 下游塞住」成因
+  let bnkBlock='';
+  if(R.bnks&&R.bnks.length){
+    bnkBlock=`<div class="bnk-detail"><div class="bd-h">🔴 瓶頸明細（出口堆積＝AGV 未及時收走，依累計排序）</div>`
+      +R.bnks.slice(0,4).map(b=>`<div class="bd-row"><div class="bd-top">`
+        +`<span class="bd-n">${b.name}</span>`
+        +`<span class="bd-t">峰值 ${b.peak}s ｜ 累計 ${b.total}s ｜ ${b.count} 次</span></div>`
+        +`<div class="bd-c ${b.cause==='agv'?'c-agv':'c-st'}">${b.cause==='agv'?'🚗 ':'⚙ '}${b.advice}</div></div>`).join('')
+      +`</div>`;
+  }
+  const hint='💡 想比較不同設備配置？按「📌 釘選此方案」存起來，再開「📋 比較表」並排看差異。';
   return `<div class="scard">`
     +`<div class="sc"><div class="k">完成 / 目標</div><div class="v grn">${nf(done)}<span class="u"> / ${nf(R.target)}</span></div></div>`
     +`<div class="sc"><div class="k">平均產能</div><div class="v">${nf(avg)}<span class="u"> 片/hr</span></div></div>`
     +`<div class="sc"><div class="k">模擬時間</div><div class="v" style="font-size:18px">${fmt(R.simT)}</div></div>`
-    +`<div class="sc"><div class="k">最重瓶頸</div><div class="v ${worstCls}" style="font-size:16px">${worst}</div></div>`
+    +`<div class="sc"><div class="k">最重瓶頸</div><div class="v ${worstCls}" style="font-size:16px">${worstName}${worstSub}</div></div>`
     +lastCell
-    +`</div><div class="ov-hint">${hint}</div>`;
+    +`</div>${bnkBlock}<div class="ov-hint">${hint}</div>`;
 }
 function checkDone(){
   const tot=abfPcs; // 作用線產出一律累計於 abfPcs
@@ -2663,8 +2734,24 @@ function maybeShowCoach(){ let seen=null; try{ seen=localStorage.getItem('sim-on
 function gatherResults(){
   const st=snapshotStats();                       // {uph,eta,done,simT}
   const bp=BLUEPRINTS[selectedLine]||{};
-  const piles=(typeof abfSt!=='undefined'?abfSt:[]).filter(s=>(s.pileT||0)>BNK_TH).sort((a,b)=>(b.pileT||0)-(a.pileT||0));
-  const worst=piles[0]?{name:piles[0].name.replace(/_\d+$/,''),pileT:Math.round(piles[0].pileT)}:null;
+  // 整場瓶頸：依顯示名（角色）聚合多台同名機台，再依「累計堆積」排序，含峰值/次數/成因
+  const stns=(typeof abfSt!=='undefined'?abfSt:[]);
+  const piled=stns.map((s,i)=>({s,i})).filter(o=>(o.s.pileCount||0)>0||(o.s.pileTotal||0)>BNK_TH);
+  const agg={};
+  for(const o of piled){
+    const nm=o.s.name.replace(/_\d+$/,'');
+    if(!agg[nm]) agg[nm]={name:nm,peak:0,total:0,count:0,rep:o.i};
+    const a=agg[nm];
+    a.peak=Math.max(a.peak,Math.round(o.s.pilePeak||0));
+    a.total+=Math.round(o.s.pileTotal||0);
+    a.count+=o.s.pileCount||0;
+    if((o.s.pilePeak||0)>(stns[a.rep].pilePeak||0)) a.rep=o.i;   // 用峰值最大的那台來診斷
+  }
+  const bnks=Object.values(agg).sort((a,b)=>b.total-a.total).map(a=>{
+    const d=diagnoseBottleneck(a.rep);
+    return {name:a.name,peak:a.peak,total:a.total,count:a.count,
+      cause:d.cause,util:d.util!=null?Math.round(d.util*100):null,advice:d.text};});
+  const worst=bnks[0]?{...bnks[0], pileT:bnks[0].peak}:null;
   const groups={}; let sm=0,sh=0,si=0;
   for(const a of abfAGVs){
     const g=a.grp||1; (groups[g]=groups[g]||{mv:0,hd:0,id:0,n:0});
@@ -2675,7 +2762,7 @@ function gatherResults(){
     return {name:(GRP_CLR[g-1]||{}).name||('G'+g),util:den>0?act/den:0,n:o.n};});
   const tAct=sm+sh,tDen=tAct+si;
   return {line:bp.name||selectedLine||'—',done:st.done,target:tgCur,uph:st.uph,eta:st.eta,simT:st.simT,
-    worst,grpUtil,avgUtil:tDen>0?tAct/tDen:0,reached:st.done>=tgCur,
+    worst,bnks,grpUtil,avgUtil:tDen>0?tAct/tDen:0,reached:st.done>=tgCur,
     perStn:(typeof abfSt!=='undefined'?abfSt:[]),perAgv:abfAGVs};
 }
 function nowStamp(){const d=new Date();const p=n=>String(n).padStart(2,'0');
@@ -2706,10 +2793,10 @@ async function exportResultPNG(){
     x.fillStyle=C.card; roundRect(x,cx,cy,cw,40,6); x.fill();
     x.fillStyle=C.dim; x.font='400 11px "Segoe UI",system-ui,sans-serif'; x.fillText(c[0],cx+10,cy+16);
     x.fillStyle=C.txt; x.font='700 16px "Segoe UI",system-ui,sans-serif'; x.fillText(c[1],cx+10,cy+33);});
-  // 最重瓶頸
+  // 最重瓶頸（峰值/累計/次數 + 成因，單行不改版面高度）
   let y=176; x.font='600 12px "Segoe UI",system-ui,sans-serif';
   x.fillStyle=R.worst?C.red:C.grn;
-  x.fillText(R.worst?`最重瓶頸：${R.worst.name}（出口堆積 ${R.worst.pileT}s）`:'最重瓶頸：無',16,y);
+  x.fillText(R.worst?`最重瓶頸：${R.worst.name}（峰值 ${R.worst.peak}s／累計 ${R.worst.total}s／${R.worst.count} 次・${R.worst.advice}）`:'最重瓶頸：無',16,y);
   // AGV 群組稼動條
   y+=18; x.fillStyle=C.dim; x.font='600 11px "Segoe UI",system-ui,sans-serif'; x.fillText('AGV 群組稼動率',16,y); y+=8;
   R.grpUtil.forEach(g=>{y+=18; const pct=Math.round(g.util*100), bx=70, bw=W-70-70;
@@ -2737,6 +2824,11 @@ function exportResultCSV(){
   let rows=[];
   rows.push(['# 摘要']); rows.push(['線別','完成片數','目標','平均UPH','模擬時間','達標ETA']);
   rows.push([R.line,R.done,R.target,R.uph,fmt(R.simT),R.reached?'已達標':R.eta]); rows.push([]);
+  rows.push(['# 瓶頸明細（出口堆積＝AGV 未及時收走）']);
+  rows.push(['站別','峰值堆積秒','累計堆積秒','次數','成因','建議']);
+  if(R.bnks&&R.bnks.length) R.bnks.forEach(b=>rows.push([b.name,b.peak,b.total,b.count,b.cause==='agv'?'AGV不足':b.cause==='station'?'站別節拍':'—',b.advice]));
+  else rows.push(['（無瓶頸）','','','','','']);
+  rows.push([]);
   rows.push(['# 站別每小時 UPH']);
   const maxH=Math.max(1,...R.perStn.map(s=>(s.prodHist||[]).length));
   const hh=['站名']; for(let i=0;i<maxH;i++) hh.push(`${i}-${i+1}hr`); hh.push('平均'); rows.push(hh);
@@ -2784,15 +2876,15 @@ function renderComparisonTable(){
 function renderAdvice(piles){
   const el=document.getElementById('bnk-advice'); if(!el) return;
   if(!piles||!piles.length){ el.innerHTML=''; return; }
-  const s=piles[0], bp=BLUEPRINTS[selectedLine];
-  const col=(bp&&bp.spine)?bp.spine.find(c=>c.xi===s.xi&&c.countKey):null;
-  const nm=s.name.replace(/_\d+$/,'');
-  let html=`<div style="margin-top:6px;font-size:11px;color:var(--dim);line-height:1.5">💡 <b>${nm}</b> 為主要瓶頸（出口堆積 ${Math.round(s.pileT)}s）。`;
-  if(col){ const cur=clampInt(P[col.countKey],1,9);
-    if(cur<9){ html+=`可試：機台數 ${cur}→${cur+1} 後重跑。</div>`
-      +`<button class="mini" style="margin-top:4px;width:100%" onclick="applyBottleneckAdvice('${col.countKey}')">套用 +1 並重跑</button>`; }
-    else html+=`機台數已達上限（${cur}）。</div>`;
-  } else html+=`建議檢視該站前後段配置。</div>`;
+  const s=piles[0], i=abfSt.indexOf(s), nm=s.name.replace(/_\d+$/,'');
+  const dg=diagnoseBottleneck(i);
+  // 出口堆積＝AGV 沒收走：依「該組稼動率」判斷缺車 vs 下游塞住，給對的建議
+  let html=`<div style="margin-top:6px;font-size:11px;color:var(--dim);line-height:1.5">💡 <b>${nm}</b> 出口堆積（峰值 ${Math.round(s.pilePeak||s.pileT)}s）。<br>${dg.text}。`;
+  if(dg.key){
+    if(dg.cur<9){ const lbl=dg.cause==='agv'?'套用 該組 AGV +1 並重跑':'套用 下游機台 +1 並重跑';
+      html+=`</div><button class="mini" style="margin-top:4px;width:100%" onclick="applyBottleneckAdvice('${dg.key}')">${lbl}</button>`; }
+    else html+=`（已達上限 ${dg.cur}）。</div>`;
+  } else html+=`</div>`;
   el.innerHTML=html;
 }
 function applyBottleneckAdvice(key){
