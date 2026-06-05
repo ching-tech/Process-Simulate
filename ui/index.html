@@ -40,14 +40,23 @@ button.pri:hover{color:#fff;filter:brightness(1.08)}
 #pb{height:100%;background:linear-gradient(90deg,var(--abf),var(--accent));width:0%;transition:width .4s}
 #main{display:flex;flex:1;overflow:hidden}
 #fw{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#stage{position:relative;flex:1;min-height:0;display:flex}
 #fsvg{width:100%;flex:1;min-height:0}
 #bot-toggle{display:flex;align-items:center;gap:6px;padding:3px 10px;background:var(--surface);border-top:1px solid var(--border);cursor:pointer;flex-shrink:0;user-select:none;font-size:11px;color:var(--dim);transition:color .15s}
 #bot-toggle:hover{color:var(--accent)}
 #bot-toggle .arrow{transition:transform .25s;font-size:10px}
-#bot-toggle.collapsed .arrow{transform:rotate(180deg)}
-#bot{display:flex;height:clamp(120px,16vh,200px);border-top:1px solid var(--border);flex-shrink:0;overflow:hidden;transition:height .25s ease}
-#bot.collapsed{height:0;border-top:none}
-#cw{flex:1;padding:6px}
+#bot-toggle.open .arrow{transform:rotate(180deg)}
+/* 統計圖表：覆蓋層，打開時蓋住流程圖成為主畫面 */
+#bot{position:absolute;inset:0;display:flex;background:var(--bg);z-index:60;overflow:hidden;animation:botIn .18s ease}
+#bot.collapsed{display:none}
+@keyframes botIn{from{opacity:0}to{opacity:1}}
+#cw{flex:1;padding:6px;display:flex;flex-direction:column;min-width:0}
+#chart-tools{display:flex;align-items:center;gap:4px;margin-bottom:4px;flex-shrink:0}
+#chart-tools button{padding:2px 8px;font-size:12px;line-height:1.4;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;cursor:pointer}
+#chart-tools button:hover{border-color:var(--accent);color:var(--accent)}
+#chart-tools .hint{font-size:10px;color:var(--dim);margin-left:auto;user-select:none}
+#cwrap{position:relative;flex:1;min-height:0;cursor:grab}
+#cwrap.panning{cursor:grabbing}
 #sp{width:clamp(220px,20vw,300px);padding:10px;border-left:1px solid var(--border);display:flex;flex-direction:column;gap:6px;overflow-y:auto;font-size:12px}
 .sr{display:flex;justify-content:space-between;align-items:center}
 .sl{font-size:11px;color:var(--dim)}
@@ -264,6 +273,7 @@ html[data-theme=dark] #clk{color:var(--yellow)}
 </div>
 <div id="main">
  <div id="fw">
+  <div id="stage">
   <svg id="fsvg" viewBox="0 0 1400 870" preserveAspectRatio="xMidYMid meet" role="img" aria-label="製程線流程圖：站別、軌道與 AGV 動態視覺化">
     <text id="abf-hdr" x="10" y="22" class="llb">ABF 製程線</text>
     <text id="abf-hdr2" x="10" y="35" class="llb2">● 滿框(綠)  ○ 空框(橘)  ▶ 加工中(藍)  ◌ AGV預訂(淡綠)  ｜ AGV車頂：●載滿框 / ○載空框</text>
@@ -273,13 +283,16 @@ html[data-theme=dark] #clk{color:var(--yellow)}
     <g id="abf-stations"></g><g id="smk-stations"></g>
     <g id="abf-agvs"></g><g id="smk-agvs"></g>
   </svg>
-  <div id="bot-toggle" onclick="toggleBot()">
-    <span class="arrow">▲</span>
-    <span id="bot-toggle-lbl">統計圖表</span>
-    <span id="bot-mini" style="margin-left:8px;color:var(--accent);font-size:11px;font-weight:600"></span>
-  </div>
-  <div id="bot">
-    <div id="cw"><canvas id="uc"></canvas></div>
+  <div id="bot" class="collapsed">
+    <div id="cw">
+      <div id="chart-tools">
+        <button type="button" onclick="zoomChart(0.8)" aria-label="放大圖表">＋ 放大</button>
+        <button type="button" onclick="zoomChart(1.25)" aria-label="縮小圖表">－ 縮小</button>
+        <button type="button" onclick="resetChartZoom()" aria-label="重置縮放">↺ 重置</button>
+        <span class="hint">滾輪縮放・拖曳左右平移</span>
+      </div>
+      <div id="cwrap"><canvas id="uc"></canvas></div>
+    </div>
     <div id="sp">
       <div style="font-size:12px;font-weight:600;color:var(--accent)">即時統計</div>
       <div id="row-auph" class="sr"><span class="sl">ABF UPH</span><span class="sv abf" id="s-auph">—</span></div>
@@ -291,6 +304,12 @@ html[data-theme=dark] #clk{color:var(--yellow)}
       <div style="font-size:11px;font-weight:600;color:var(--red)">瓶頸警示（PORT 堆積）</div>
       <div id="bnklist"><div class="nob">目前無瓶頸</div></div><div id="bnk-advice"></div></div>
     </div>
+  </div>
+  </div>
+  <div id="bot-toggle" onclick="toggleBot()">
+    <span class="arrow">▲</span>
+    <span id="bot-toggle-lbl">統計圖表</span>
+    <span id="bot-mini" style="margin-left:8px;color:var(--accent);font-size:11px;font-weight:600"></span>
   </div>
  </div>
  <div id="sb"><div id="sbi">
@@ -785,6 +804,8 @@ let simT=0, running=false, spd=1, lastRT=null, rafId=null;
 let viewMode='detailed', simpleCols=[]; // 'detailed' | 'simple'（精簡雙視圖）
 let abfSt=[], abfAGVs=[];
 let abfOut=[], abfPcs=0, lastChart=-999;
+let tgCur=0; // 目前有效目標（達標後再按播放會以基數 P.tg 累加延長）
+let uphPeak=0; // 目前 UPH 峰值（用於動態調整圖表 y 軸上限）
 let chart=null, cdata={labels:[],vals:[]};
 
 // ══════════════════════════════════════════════════════════════
@@ -845,6 +866,8 @@ function initSim(){
   LC = buildLineConfig(selectedLine); // 依當前 P 的設備數量動態產生 line config
   simT=0; running=false; lastRT=null;
   abfOut=[]; abfPcs=0; lastChart=-999;
+  tgCur=P.tg; // 每次重置回基數目標
+  uphPeak=0; chartView=null;
   cdata={labels:[],vals:[]};
 
   const _b=buildSimState(LC); abfSt=_b.st; abfAGVs=_b.agvs;
@@ -862,12 +885,12 @@ function initSim(){
   _svg.setAttribute('viewBox', viewMode==='simple' ? LC.layout.simple.viewBox : LC.layout.viewBox);
   syncCamera();
 
-  if(chart){chart.data.labels=[];chart.data.datasets[0].data=[];chart.update('none');}
+  if(chart){chart.data.labels=[];chart.data.datasets[0].data=[];applyYAxisMax();chart.update('none');}
   syncChartLine();
   updateUI();
   document.getElementById('bplay').textContent='▶ 播放';
   document.getElementById('ov').classList.remove('show');
-  document.getElementById('s-tgt').textContent=nf(P.tg)+' 片';
+  document.getElementById('s-tgt').textContent=nf(tgCur)+' 片';
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1106,7 +1129,7 @@ function stepABFAgv(agv, dt){
 
 function checkDone(){
   const tot=abfPcs; // 作用線產出一律累計於 abfPcs
-  if(tot>=P.tg){
+  if(tot>=tgCur){
     running=false;
     document.getElementById('bplay').textContent='▶ 播放';
     document.getElementById('ovm').textContent=`已完成 ${nf(tot)} 片，模擬時間 ${fmt(simT)}`;
@@ -1129,10 +1152,19 @@ function tick(rt){
   rafId=requestAnimationFrame(tick);
 }
 function togglePlay(){
+  // 已達目前目標後再按播放 → 以基數 P.tg 累加延長目標，繼續模擬（4000→8000→12000…）
+  if(!running && abfPcs>=tgCur) extendTarget();
   running=!running;
   document.getElementById('bplay').textContent=running?'⏸ 暫停':'▶ 播放';
   if(running){lastRT=null;rafId=requestAnimationFrame(tick);}
   else if(rafId)cancelAnimationFrame(rafId);
+}
+// 延長目標一個基數，並關閉結果視窗、刷新目標顯示
+function extendTarget(){
+  tgCur+=P.tg;
+  closeOv();
+  const t=document.getElementById('s-tgt'); if(t)t.textContent=nf(tgCur)+' 片';
+  updateUI();
 }
 function setSpeed(s){
   spd=s;[1,2,5,10].forEach(v=>document.getElementById(`b${v}x`).classList.toggle('act',v===s));
@@ -1142,6 +1174,8 @@ let fastRun=false;
 function fastForward(){
   if(fastRun) return;
   if(running) togglePlay();              // 停掉動畫播放
+  // 已達目前目標後再按「立即結果」→ 同樣以基數累加延長目標再繼續
+  if(abfPcs>=tgCur) extendTarget();
   fastRun=true;
   const dt=1, CHUNK=80000;
   const MAX_SIMT=simT + 5000*3600;       // 上限：再模擬 5000 小時（安全網，多數目標會提早達成）
@@ -1149,36 +1183,36 @@ function fastForward(){
   if(btn){ btn.disabled=true; }
   function step(){
     let n=0;
-    while(n<CHUNK && abfPcs<P.tg && simT<MAX_SIMT){
+    while(n<CHUNK && abfPcs<tgCur && simT<MAX_SIMT){
       updateABFMachines(dt); for(const a of abfAGVs) stepABFAgv(a,dt); simT+=dt; n++;
     }
-    if(abfPcs>=P.tg || simT>=MAX_SIMT){
+    if(abfPcs>=tgCur || simT>=MAX_SIMT){
       fastRun=false;
       if(btn){ btn.disabled=false; btn.textContent='⏩ 立即結果'; }
-      lastChart=-999; cdata={labels:[],vals:[]};
-      if(chart){chart.data.labels=[];chart.data.datasets[0].data=[];chart.update('none');}
+      lastChart=simT;            // 之後若再按播放，圖表自此接續
+      rebuildChartFromHistory(); // 以 abfOut 回填整條曲線（取代原本清空）
       updateUI();
       showFastResult();
     } else {
-      if(btn) btn.textContent=`⏳ ${Math.min(99,Math.round(abfPcs/P.tg*100))}%`;
+      if(btn) btn.textContent=`⏳ ${Math.min(99,Math.round(abfPcs/tgCur*100))}%`;
       requestAnimationFrame(step);
     }
   }
   requestAnimationFrame(step);
 }
 function showFastResult(){
-  const done=abfPcs, reached=done>=P.tg;
+  const done=abfPcs, reached=done>=tgCur;
   const avg = simT>0 ? Math.round(done/(simT/3600)) : 0; // 平均產能 = 總片數 / 總時數
   const recentUph=calcUPH(abfOut,simT,curBatch());
   const ovh=document.getElementById('ovh'), ovm=document.getElementById('ovm');
   let msg;
   if(reached){
     if(ovh) ovh.textContent='✅ 達成目標';
-    msg=`完成 ${nf(P.tg)} 片<br>模擬時間 <b>${fmt(simT)}</b><br>平均產能 <b>${nf(avg)}</b> 片/hr`;
+    msg=`完成 ${nf(tgCur)} 片<br>模擬時間 <b>${fmt(simT)}</b><br>平均產能 <b>${nf(avg)}</b> 片/hr`;
   } else {
     if(ovh) ovh.textContent='⏱ 計算結果（達上限）';
-    let eta='—'; if(recentUph>0) eta=fmt(simT + (P.tg-done)/recentUph*3600);
-    msg=`已模擬 ${fmt(simT)}<br>完成 ${nf(done)} / ${nf(P.tg)} 片<br>目前 UPH ${nf(recentUph)} 片/hr<br>預估達標時間 <b>${eta}</b>`;
+    let eta='—'; if(recentUph>0) eta=fmt(simT + (tgCur-done)/recentUph*3600);
+    msg=`已模擬 ${fmt(simT)}<br>完成 ${nf(done)} / ${nf(tgCur)} 片<br>目前 UPH ${nf(recentUph)} 片/hr<br>預估達標時間 <b>${eta}</b>`;
   }
   if(ovm) ovm.innerHTML=msg;
   openOv();
@@ -1191,9 +1225,10 @@ function resetSim(){running=false;if(rafId)cancelAnimationFrame(rafId);liveMarks
 function toggleBot(){
   const bot=document.getElementById('bot');
   const tog=document.getElementById('bot-toggle');
-  const collapsed=bot.classList.toggle('collapsed');
-  tog.classList.toggle('collapsed',collapsed);
-  if(chart) setTimeout(()=>chart.resize(),260);
+  const open=bot.classList.contains('collapsed');   // 目前關閉 → 將要打開
+  bot.classList.toggle('collapsed',!open);
+  tog.classList.toggle('open',open);
+  if(open && chart) setTimeout(()=>{chart.resize();applyChartView();},30);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1993,13 +2028,13 @@ function updateUI(){
 const nf=n=>Number(n||0).toLocaleString('en-US');
 function updateProgressAndStats(tot, uph){
   uph=uph||0;
-  const pct=Math.min(100,tot/P.tg*100);
+  const pct=Math.min(100,tot/tgCur*100);
   document.getElementById('pb').style.width=pct+'%';
-  document.getElementById('pbl').textContent=`完成 ${nf(tot)} / ${nf(P.tg)} 片`;
+  document.getElementById('pbl').textContent=`完成 ${nf(tot)} / ${nf(tgCur)} 片`;
   const au=document.getElementById('s-auph'); if(au) au.textContent=uph>0?`${nf(uph)} 片/hr`:'—';
   document.getElementById('s-done').textContent=nf(tot)+' 片';
   let etaTxt='—';
-  if(uph>0&&tot<P.tg){ etaTxt=fmt(simT+(P.tg-tot)/uph*3600); }
+  if(uph>0&&tot<tgCur){ etaTxt=fmt(simT+(tgCur-tot)/uph*3600); }
   document.getElementById('s-eta').textContent=etaTxt;
   // mini stats in toggle bar when bot is collapsed
   const mini=document.getElementById('bot-mini');
@@ -2077,16 +2112,117 @@ function calcUPH(comps,now,bt){
   if(el<120)return 0;
   return Math.round(recent.length*bt/el*3600);
 }
+// 進位到最高位數（1 個有效位）的整數，用於 y 軸上限：222→300、1234→2000、45→50
+function niceCeil(v){
+  if(v<=0) return 10;
+  const mag=Math.pow(10,Math.floor(Math.log10(v)));
+  return Math.ceil(v/mag)*mag;
+}
+// 依目前 UPH 峰值（加 10% 緩衝）設定 y 軸上限；峰值為 0 時交還自動縮放
+function applyYAxisMax(){
+  if(!chart) return;
+  chart.options.scales.y.max = uphPeak>0 ? niceCeil(uphPeak*1.1) : undefined;
+}
+
+// ── 圖表縮放／左右平移（category 軸以索引設定可視窗，null=全範圍）──
+let chartView=null; // {min,max} 索引；null 表示顯示全部
+function chartLen(){ return cdata.vals.length; }
+function applyChartView(){
+  if(!chart) return;
+  const x=chart.options.scales.x;
+  if(chartView && chartLen()>1){ x.min=chartView.min; x.max=chartView.max; }
+  else { x.min=undefined; x.max=undefined; }
+  chart.update('none');
+}
+// factor<1 放大、>1 縮小；centerIdx 為縮放中心（滾輪時為游標位置）
+function zoomChart(factor, centerIdx){
+  const n=chartLen(); if(n<2) return;
+  let lo=chartView?chartView.min:0, hi=chartView?chartView.max:n-1;
+  if(centerIdx==null||isNaN(centerIdx)) centerIdx=(lo+hi)/2;
+  centerIdx=Math.max(lo,Math.min(hi,centerIdx));
+  const span=hi-lo, newSpan=Math.max(2,Math.min(n-1,span*factor));
+  const ratio=span>0?(centerIdx-lo)/span:0.5;
+  let nlo=centerIdx-newSpan*ratio, nhi=nlo+newSpan;
+  if(nlo<0){nhi-=nlo;nlo=0;}
+  if(nhi>n-1){nlo-=(nhi-(n-1));nhi=n-1;}
+  nlo=Math.max(0,nlo);
+  if(nhi-nlo>=n-1.5) chartView=null; else chartView={min:Math.round(nlo),max:Math.round(nhi)};
+  applyChartView();
+}
+function panChart(dIdx){
+  const n=chartLen(); if(!chartView||n<2) return;
+  const span=chartView.max-chartView.min;
+  let nlo=chartView.min+dIdx, nhi=nlo+span;
+  if(nlo<0){nlo=0;nhi=span;}
+  if(nhi>n-1){nhi=n-1;nlo=nhi-span;}
+  chartView={min:Math.round(nlo),max:Math.round(nhi)};
+  applyChartView();
+}
+function resetChartZoom(){ chartView=null; applyChartView(); }
+// 綁定滾輪縮放與拖曳平移（只在圖表打開時有作用）
+function initChartInteractions(){
+  const wrap=document.getElementById('cwrap'), cv=document.getElementById('uc');
+  if(!wrap||!cv) return;
+  cv.addEventListener('wheel',e=>{
+    if(!chart||chartLen()<2) return;
+    e.preventDefault();
+    const px=e.clientX-cv.getBoundingClientRect().left;
+    const idx=chart.scales.x.getValueForPixel(px);
+    zoomChart(e.deltaY<0?0.8:1.25, idx);
+  },{passive:false});
+  let drag=null;
+  cv.addEventListener('pointerdown',e=>{
+    if(!chartView||chartLen()<2) return;     // 需先放大才可平移
+    drag={x:e.clientX,min:chartView.min,max:chartView.max};
+    wrap.classList.add('panning');
+    cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener('pointermove',e=>{
+    if(!drag||!chart) return;
+    const xs=chart.scales.x, span=drag.max-drag.min;
+    const ppi=(xs.right-xs.left)/Math.max(1,span);   // 每索引像素
+    const dIdx=-(e.clientX-drag.x)/ppi;
+    chartView={min:drag.min,max:drag.max};
+    panChart(dIdx);
+  });
+  const end=e=>{ drag=null; wrap.classList.remove('panning'); };
+  cv.addEventListener('pointerup',end);
+  cv.addEventListener('pointercancel',end);
+}
 function updateChart(){
   const min=Math.floor(simT/60);
   cdata.labels.push(min);
   // 作用線產出一律在 abfOut（單一「當前線」資料集）
-  cdata.vals.push(calcUPH(abfOut,simT,curBatch()));
+  const v=calcUPH(abfOut,simT,curBatch());
+  cdata.vals.push(v);
+  if(v>uphPeak) uphPeak=v;
   if(chart){
     chart.data.labels=cdata.labels;
     chart.data.datasets[0].data=cdata.vals;
+    applyYAxisMax();
     chart.update('none');
   }
+}
+// 立即結果用：以 abfOut 時間戳回填整條 UPH 曲線（含上界的 1 小時滑動窗），長時間自動降採樣
+function rebuildChartFromHistory(){
+  const bt=curBatch(), win=3600, totalMin=Math.floor(simT/60), MAXP=600;
+  cdata={labels:[],vals:[]};
+  uphPeak=0;
+  if(totalMin>=2 && abfOut.length){
+    const step=Math.max(1,Math.ceil(totalMin/MAXP));
+    for(let m=step;m<=totalMin;m+=step){
+      const t=m*60, lo=t-win;
+      let c=0; // 落在 (t-1hr, t] 的產出數
+      for(let i=0;i<abfOut.length;i++){const x=abfOut[i]; if(x<=lo)continue; if(x>t)break; c++;}
+      const el=Math.min(t,win);
+      const v=el<120||c===0?0:Math.round(c*bt/el*3600);
+      if(v>uphPeak) uphPeak=v;
+      cdata.labels.push(m);
+      cdata.vals.push(v);
+    }
+  }
+  chartView=null; // 回填後回到全範圍，避免沿用舊縮放索引
+  if(chart){chart.data.labels=cdata.labels;chart.data.datasets[0].data=cdata.vals;applyYAxisMax();applyChartView();}
 }
 // 將圖表資料集標籤/顏色同步為當前線（color 為 css var → 取實際色）
 function cssVar(v){ const m=/var\((--[\w-]+)\)/.exec(v||''); return m? (getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim()||'#0a6ebd') : (v||'#0a6ebd'); }
@@ -2349,7 +2485,7 @@ function applyP(){
 }
 function applyLiveParam(key,val){
   // SMK 改 ABF 式固定分組後，即時參數僅剩目標產量
-  if(key==='tg'){P.tg=val;const t=document.getElementById('s-tgt');if(t)t.textContent=nf(val)+' 片';}
+  if(key==='tg'){P.tg=val;tgCur=val;const t=document.getElementById('s-tgt');if(t)t.textContent=nf(val)+' 片';}
 }
 
 // ── 套用前後對比卡 ──
@@ -2357,7 +2493,7 @@ function snapshotStats(){
   // 作用線產出一律在 abfPcs/abfOut（一般化引擎）
   const tot=abfPcs;
   const uph=calcUPH(abfOut,simT,curBatch());
-  let eta='—'; if(uph>0&&tot<P.tg) eta=fmt(simT+(P.tg-tot)/uph*3600);
+  let eta='—'; if(uph>0&&tot<tgCur) eta=fmt(simT+(tgCur-tot)/uph*3600);
   return {uph,eta,done:tot,simT};
 }
 function showCompareCard(before,label){
@@ -2434,8 +2570,8 @@ function gatherResults(){
   const grpUtil=Object.keys(groups).sort().map(g=>{const o=groups[g],act=o.mv+o.hd,den=act+o.id;
     return {name:(GRP_CLR[g-1]||{}).name||('G'+g),util:den>0?act/den:0,n:o.n};});
   const tAct=sm+sh,tDen=tAct+si;
-  return {line:bp.name||selectedLine||'—',done:st.done,target:P.tg,uph:st.uph,eta:st.eta,simT:st.simT,
-    worst,grpUtil,avgUtil:tDen>0?tAct/tDen:0,reached:st.done>=P.tg,
+  return {line:bp.name||selectedLine||'—',done:st.done,target:tgCur,uph:st.uph,eta:st.eta,simT:st.simT,
+    worst,grpUtil,avgUtil:tDen>0?tAct/tDen:0,reached:st.done>=tgCur,
     perStn:(typeof abfSt!=='undefined'?abfSt:[]),perAgv:abfAGVs};
 }
 function nowStamp(){const d=new Date();const p=n=>String(n).padStart(2,'0');
@@ -3001,6 +3137,7 @@ window.addEventListener('load',()=>{
   initTheme();
   setupKeyboard();
   initChart();
+  initChartInteractions();
   const lh=document.getElementById('logo-hdr'), ls=document.getElementById('logo-sel');
   if(lh) lh.src=LOGO_SRC; if(ls) ls.src=LOGO_SRC;
   loadCustomLines();           // 還原自訂線 → 合併 DEF/P
