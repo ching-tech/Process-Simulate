@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Process Simulate | 擎添工業製程 AGV 模擬系統</title>
+  <meta name="description" content="擎添工業 Process Simulate，純前端製程 AGV 動態模擬器，用於比較 ABF、SMK 與自訂產線的產能、瓶頸、UPH 與 AGV 稼動率。">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://ching-tech.github.io/Process-Simulate/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="zh_TW">
+  <meta property="og:site_name" content="Ching Tech Case Hub">
+  <meta property="og:title" content="Process Simulate | 擎添工業製程 AGV 模擬系統">
+  <meta property="og:description" content="以瀏覽器直接執行的製程 AGV 模擬器，支援 ABF、SMK、自訂產線、UPH 圖表、瓶頸診斷與方案比較。">
+  <meta property="og:url" content="https://ching-tech.github.io/Process-Simulate/">
+  <meta property="og:image" content="https://ching-tech.github.io/Process-Simulate/src-tauri/app-icon-agv-sim.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Process Simulate | 擎添工業製程 AGV 模擬系統">
+  <meta name="twitter:description" content="ABF / SMK 製程 AGV 產能、瓶頸與稼動率線上模擬 Demo。">
+  <meta name="twitter:image" content="https://ching-tech.github.io/Process-Simulate/src-tauri/app-icon-agv-sim.png">
+  <meta name="theme-color" content="#0a6ebd">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Process Simulate",
+    "alternateName": "製程 AGV 模擬系統",
+    "applicationCategory": "IndustrialApplication",
+    "operatingSystem": "Web, Windows",
+    "url": "https://ching-tech.github.io/Process-Simulate/",
+    "codeRepository": "https://github.com/ching-tech/Process-Simulate",
+    "creator": {
+      "@type": "Organization",
+      "name": "擎添工業 Ching Tech",
+      "url": "https://ching-tech.github.io/chingtech-case-hub/"
+    },
+    "description": "純前端製程 AGV 動態模擬器，用於觀察產能、瓶頸與 AGV 稼動率。"
+  }
+  </script>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --panel: #edf3f9;
+      --line: #d4dfeb;
+      --text: #152236;
+      --muted: #586a80;
+      --blue: #0a6ebd;
+      --green: #16805b;
+      --orange: #c95f11;
+      color-scheme: light;
+    }
+    html[data-theme="dark"] {
+      --bg: #111821;
+      --surface: #172230;
+      --panel: #202c3a;
+      --line: #34475d;
+      --text: #edf3f9;
+      --muted: #a9b8ca;
+      --blue: #55a6df;
+      --green: #58bd91;
+      --orange: #ef8a3d;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: inherit; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: color-mix(in srgb, var(--surface) 94%, transparent);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+    }
+    .bar {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand img { width: 38px; height: 38px; border-radius: 8px; }
+    .brand b { display: block; font-size: 16px; line-height: 1.25; }
+    .brand span { display: block; color: var(--muted); font-size: 12px; }
+    .actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 7px 12px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+    .btn:hover { border-color: var(--blue); text-decoration: none; }
+    main {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 20px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 14px;
+    }
+    h1 { margin: 0 0 8px; font-size: clamp(26px, 4vw, 44px); line-height: 1.12; letter-spacing: 0; }
+    .lead { margin: 0; max-width: 820px; color: var(--muted); line-height: 1.7; }
+    .facts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .facts span {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      border-radius: 6px;
+      padding: 7px 9px;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .demo {
+      min-height: 72vh;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--surface);
+      box-shadow: 0 18px 60px rgba(15, 35, 58, .12);
+    }
+    iframe {
+      display: block;
+      width: 100%;
+      height: 72vh;
+      min-height: 620px;
+      border: 0;
+      background: #eef2f8;
+    }
+    .manual {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .tile {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      padding: 14px;
+    }
+    .tile b { display: block; margin-bottom: 6px; }
+    .tile p { margin: 0; color: var(--muted); line-height: 1.6; font-size: 14px; }
+    footer {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 8px 18px 28px;
+      color: var(--muted);
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 880px) {
+      .summary { grid-template-columns: 1fr; }
+      .facts { justify-content: flex-start; }
+      .manual { grid-template-columns: 1fr; }
+      iframe { height: 76vh; min-height: 560px; }
+      .brand span { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <a class="brand" href="https://ching-tech.github.io/chingtech-case-hub/" aria-label="回到 Ching Tech Case Hub">
+        <img src="src-tauri/app-icon-agv-sim.png" alt="">
+        <span><b>Process Simulate</b><span>擎添工業製程 AGV 模擬系統</span></span>
+      </a>
+      <nav class="actions" aria-label="頁面操作">
+        <button class="btn" type="button" id="themeToggle">深色</button>
+        <a class="btn" href="https://ching-tech.github.io/chingtech-case-hub/">Case Hub</a>
+        <a class="btn" href="https://github.com/ching-tech/Process-Simulate">GitHub</a>
+        <a class="btn primary" href="ui/index.html">開啟全頁 Demo</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <section class="summary" aria-label="專案摘要">
+      <div>
+        <h1>製程 AGV 動態模擬系統</h1>
+        <p class="lead">直接在瀏覽器執行 ABF、SMK 與自訂產線的 AGV 模擬，觀察 UPH、瓶頸堆積、AGV 稼動率與方案比較。下方嵌入的是實際 Demo，可直接操作。</p>
+      </div>
+      <div class="facts" aria-label="功能標籤">
+        <span>純前端</span>
+        <span>ABF / SMK</span>
+        <span>瓶頸診斷</span>
+        <span>PNG / CSV 匯出</span>
+      </div>
+    </section>
+    <section class="demo" aria-label="Process Simulate 線上 Demo">
+      <iframe src="ui/index.html" title="Process Simulate 製程 AGV 模擬器"></iframe>
+    </section>
+    <section class="manual" aria-label="操作重點">
+      <article class="tile"><b>選擇產線</b><p>從 ABF、SMK 或自訂產線開始，系統會依站別流程建立設備與搬運群組。</p></article>
+      <article class="tile"><b>調整參數</b><p>修改機台數、AGV 數量、處理時間、路段時間與目標產量後套用比較。</p></article>
+      <article class="tile"><b>觀察瓶頸</b><p>即時查看出滿框堆積、站別 UPH 與 AGV 稼動率，判斷缺車或站點節拍不足。</p></article>
+      <article class="tile"><b>輸出結果</b><p>把方案釘選成比較表，或輸出 PNG 報告、CSV、JSON 情境資料。</p></article>
+    </section>
+  </main>
+  <footer>
+    <span>© Ching Tech 擎添工業</span>
+    <span><a href="https://github.com/ching-tech/Process-Simulate">GitHub Repo</a> · <a href="https://ching-tech.github.io/chingtech-case-hub/">Case Hub</a></span>
+  </footer>
+  <script>
+    const root = document.documentElement;
+    const key = "chingtech-process-theme";
+    const saved = localStorage.getItem(key);
+    if (saved) root.dataset.theme = saved;
+    const toggle = document.getElementById("themeToggle");
+    const sync = () => { toggle.textContent = root.dataset.theme === "dark" ? "淺色" : "深色"; };
+    toggle.addEventListener("click", () => {
+      root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark";
+      localStorage.setItem(key, root.dataset.theme);
+      sync();
+    });
+    sync();
+  </script>
+</body>
+</html>
