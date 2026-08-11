@@ -1,0 +1,26 @@
+# Process Simulate — 製程 AGV 模擬系統
+
+> 擎添工業（ChingTech）的純前端製程 AGV（無人搬運車）動態模擬器。
+> 用來觀察 ABF 與 SMK 兩條製程線在不同參數下的產能、瓶頸與 AGV 稼動狀況。
+> 瀏覽器直接執行，也可用 Tauri v2 打包成 Windows 桌面應用離線使用。
+
+## 關於
+- 開發單位：擎添工業（ChingTech），1984 年成立，深耕機電自動化逾 40 年
+- 類型：純前端工程模擬工具（GitHub Pages demo，無後端、無帳號）
+- 桌面版：Tauri v2（使用系統 WebView2，安裝檔小、可離線）
+
+## 能做什麼
+- 內建 ABF、SMK 兩條製程線，也可自訂產線配置
+- 模擬 AGV 在各站點之間的搬運任務，觀察動態流動
+- UPH 圖表、瓶頸診斷、AGV 稼動率統計
+- 多方案參數比較，評估車輛數與站點配置的產能影響
+
+## 適合誰
+- 評估製程線導入 AGV 的產能效益
+- 決定 AGV 投放台數與路徑配置
+- 向客戶或內部說明搬運瓶頸落在哪裡
+
+## 連結
+- 線上模擬：https://ching-tech.github.io/Process-Simulate/
+- 案例展示資料庫：https://ching-tech.github.io/chingtech-case-hub/
+- 官網：https://ching-tech.com
