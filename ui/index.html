@@ -19,6 +19,7 @@
 <meta name="twitter:image" content="https://ching-tech.github.io/Process-Simulate/src-tauri/app-icon-agv-sim.png">
 <meta name="theme-color" content="#0a6ebd">
 <script src="vendor/chart.umd.min.js"></script>
+<script src="aisles-h05.js"></script>
 <style>
 :root{--bg:#eef2f8;--surface:#ffffff;--card:#f3f6fb;--border:#cdd8e8;--text:#18233a;--dim:#475873;--accent:#0a6ebd;--green:#00922f;--yellow:#9a7000;--orange:#d9600a;--red:#cc1111;--abf:#1565c0;--smk:#d9600a;
   --g1:#0277bd;--g2:#00853a;--g3:#7b2fbf;
@@ -205,22 +206,30 @@ body.present #btn-present{background:var(--accent);color:#fff;border-color:var(-
 #agv-board tr.tot td{font-weight:700;border-top:2px solid var(--accent);border-bottom:none}
 #agv-board .ub{display:inline-block;vertical-align:middle;width:70px;height:9px;background:var(--card);border-radius:5px;overflow:hidden;margin-left:6px;border:1px solid var(--border)}
 #agv-board .ub>i{display:block;height:100%;background:linear-gradient(90deg,var(--green),var(--accent))}
-/* line builder wizard */
-#line-wizard{display:none;position:fixed;inset:0;z-index:260;background:#0b1322cc;justify-content:center;align-items:flex-start;overflow:auto;padding:24px}
-#line-wizard.show{display:flex}
-#line-wizard .wz{background:var(--surface);border:2px solid var(--accent);border-radius:10px;padding:16px 20px;width:700px;max-width:94vw;box-shadow:0 8px 40px #000a}
-#line-wizard h3{color:var(--accent);font-size:16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
-#line-wizard .wzclose{cursor:pointer;color:var(--dim);font-size:20px}
-#line-wizard .wsec{border:1px solid var(--border);border-radius:6px;padding:9px 10px;margin-bottom:9px}
-#line-wizard .wsec h4{font-size:12px;margin-bottom:7px;color:var(--text)}
-#line-wizard label{font-size:11px;color:var(--dim);margin:0 3px}
-#line-wizard input,#line-wizard select{background:var(--card);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:12px}
-#line-wizard table{width:100%;border-collapse:collapse;font-size:12px}
-#line-wizard th{color:var(--dim);font-weight:600;font-size:11px;text-align:left;padding:2px 4px}
-#line-wizard td{padding:2px 4px;border-bottom:1px solid var(--border)}
-#line-wizard .sr{display:flex;justify-content:space-between;align-items:center;margin:2px 0}
 #wz-msg{font-size:12px;white-space:pre-wrap;margin:6px 0;min-height:16px;color:var(--dim)}
 #wz-msg.ok{color:var(--green)} #wz-msg.err{color:var(--red)}
+/* plan editor：沿用精靈的樣式，只多加畫布相關 */
+#plan-editor{display:none;position:fixed;inset:0;z-index:260;background:#0b1322cc;justify-content:center;align-items:flex-start;overflow:auto;padding:24px}
+#plan-editor.show{display:flex}
+#plan-editor .wz{background:var(--surface);border:2px solid var(--accent);border-radius:10px;padding:16px 20px;box-shadow:0 8px 40px #000a}
+#plan-editor h3{color:var(--accent);font-size:16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+#plan-editor .wzclose{cursor:pointer;color:var(--dim);font-size:20px;background:none;border:0;
+  padding:2px 8px;line-height:1;border-radius:6px}
+#plan-editor .wzclose:hover{background:var(--card);color:var(--red)}
+#plan-editor .wsec{border:1px solid var(--border);border-radius:6px;padding:9px 10px;margin-bottom:9px}
+#plan-editor .wsec h4{font-size:12px;margin-bottom:7px;color:var(--text)}
+#plan-editor label{font-size:11px;color:var(--dim);margin:0 3px}
+#plan-editor input,#plan-editor select{background:var(--card);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:12px}
+#plan-editor table{width:100%;border-collapse:collapse;font-size:12px}
+#plan-editor th{color:var(--dim);font-weight:600;font-size:11px;text-align:left;padding:2px 4px}
+#plan-editor td{padding:2px 4px;border-bottom:1px solid var(--border)}
+#plan-editor .sr{display:flex;justify-content:space-between;align-items:center;margin:2px 0;gap:6px}
+#pe-canvas img{display:block;max-width:none;user-select:none;-webkit-user-drag:none}
+.pe-node{position:absolute;transform:translate(-50%,-50%);padding:2px 7px;border-radius:12px;font-size:11px;font-weight:700;
+  cursor:grab;white-space:nowrap;border:2px solid #fff;box-shadow:0 1px 5px #0006;color:#fff}
+.pe-node.sel{outline:3px solid var(--accent);outline-offset:2px}
+#pe-msg{font-size:12px;white-space:pre-wrap;margin:6px 0;min-height:16px;color:var(--dim)}
+#pe-msg.ok{color:var(--green)} #pe-msg.err{color:var(--red)}
 .line-card-wrap{position:relative}
 .line-card-tools{position:absolute;top:4px;right:4px;display:flex;gap:3px}
 .line-card-tools button{font-size:11px;padding:2px 5px;line-height:1}
@@ -304,7 +313,7 @@ html[data-theme=dark] #clk{color:var(--yellow)}
   <div id="hdr-main">
     <!-- 上：資訊列 -->
     <div id="hdr-info">
-      <div id="ttl">欣興電子 AGV 模擬</div>
+      <div id="ttl">流程計算系統</div>
       <div id="clk">00:00:00</div>
       <div id="prog">
         <div id="pbl">完成 0 / 4,000 片</div>
@@ -440,29 +449,40 @@ html[data-theme=dark] #clk{color:var(--yellow)}
 </div>
 <input id="import-file" type="file" accept=".json" style="display:none" onchange="importParams(event)">
 <input id="import-line" type="file" accept=".json" style="display:none" onchange="importLineFile(event)">
-<div id="line-wizard" onclick="if(event.target===this)closeWizard()">
-  <div class="wz" role="dialog" aria-modal="true" aria-labelledby="wz-title">
-    <h3><span id="wz-title">新增製程線</span><span class="wzclose" onclick="closeWizard()" role="button" tabindex="0" aria-label="關閉精靈">✕</span></h3>
-    <div class="wsec"><h4>① 基本</h4>
-      <label>名稱</label><input id="wz-name" placeholder="例如：FCBGA 線" style="width:160px">
-      <label>每框片數</label><input id="wz-batch" type="number" min="1" value="1" style="width:56px">
-      <label>顏色</label><input id="wz-color" type="color" value="#0a6ebd" style="width:38px;padding:0;height:26px">
+<div id="plan-editor" onclick="if(event.target===this)closePlanEd()">
+  <div class="wz" role="dialog" aria-modal="true" aria-labelledby="pe-title" style="max-width:1080px;width:96vw">
+    <h3><span id="pe-title">平面版面編輯器</span><button type="button" id="pe-close" class="wzclose" aria-label="關閉編輯器">✕</button></h3>
+    <div class="wsec"><h4>① 基本 ＋ 底圖</h4>
+      <label>名稱</label><input id="pe-name" placeholder="例如：H05 5F PLS" style="width:150px">
+      <label>每框片數</label><input id="pe-batch" type="number" min="1" value="1" style="width:52px">
+      <label>顏色</label><input id="pe-color" type="color" value="#2e8b57" style="width:36px;padding:0;height:26px">
+      <label>底圖</label><input id="pe-bg" type="file" accept="image/*" onchange="peLoadBg(event)" style="width:170px;font-size:11px">
+      <label title="圖上 1 像素等於幾秒的走行時間">秒/像素</label><input id="pe-spu" type="number" min="0.001" step="0.01" value="0.1" style="width:56px" onchange="peSync()">
     </div>
-    <div class="wsec"><h4>② 站別流程（依序；首站＝補料、末站＝換框）</h4>
-      <table><thead><tr><th>#</th><th>名稱</th><th>型別</th><th>處理秒／容量</th><th>排序</th><th></th></tr></thead>
-      <tbody id="wz-stns"></tbody></table>
-      <button class="mini" onclick="wzAddStation()" style="margin-top:6px">＋ 新增站別</button>
+    <div class="wsec"><h4>② 機台（在圖上點一下新增，拖曳可搬位置）</h4>
+      <div id="pe-canvas-wrap" style="position:relative;overflow:auto;max-height:46vh;border:1px solid var(--border);border-radius:6px;background:var(--card)">
+        <div id="pe-canvas" style="position:relative;transform-origin:0 0;cursor:crosshair"></div>
+      </div>
+      <table style="margin-top:6px"><thead><tr><th>#</th><th>名稱</th><th>型別</th><th>處理秒／容量</th><th>台數</th><th>空框處理</th><th title="模擬一開始，這一站的收空框位有沒有框">起始空框</th><th></th></tr></thead>
+      <tbody id="pe-stns"></tbody></table>
     </div>
-    <div class="wsec"><h4>③ 搬運群組 AGV（依站別自動分組）</h4><div id="wz-groups"></div></div>
-    <div class="wsec"><h4>④ 預設時間</h4>
-      <label>每段行走(秒)</label><input id="wz-seg" type="number" min="1" value="200" style="width:58px">
-      <label>取料(秒)</label><input id="wz-pick" type="number" min="0" value="0" style="width:50px">
-      <label>放料(秒)</label><input id="wz-drop" type="number" min="0" value="0" style="width:50px">
+    <div class="wsec"><h4>③ 搬運任務（哪一站 → 哪一站，誰做）</h4>
+      <table><thead><tr><th>來源</th><th></th><th>目的</th><th>載什麼</th><th>指派</th><th></th></tr></thead>
+      <tbody id="pe-tasks"></tbody></table>
+      <button class="mini" onclick="peAddTask()" style="margin-top:6px">＋ 新增任務</button>
     </div>
-    <div id="wz-msg"></div>
+    <div class="wsec"><h4>④ AGV 隊伍</h4><div id="pe-teams"></div>
+      <button class="mini" onclick="peAddTeam()" style="margin-top:6px">＋ 新增隊伍</button>
+    </div>
+    <div class="wsec"><h4>⑤ 預設取放時間</h4>
+      <label>取料(秒)</label><input id="pe-pick" type="number" min="0" value="30" style="width:50px">
+      <label>放料(秒)</label><input id="pe-drop" type="number" min="0" value="30" style="width:50px">
+    </div>
+    <div id="pe-msg"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button class="mini" onclick="wzDryRun()">驗證／乾跑</button>
-      <button onclick="wzSave()" style="background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600">儲存並加入</button>
+      <button class="mini" id="pe-cancel">關閉</button>
+      <button class="mini" onclick="peDryRun()">驗證／乾跑</button>
+      <button onclick="peSave()" style="background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600">儲存並加入</button>
     </div>
   </div>
 </div>
@@ -478,7 +498,7 @@ html[data-theme=dark] #clk{color:var(--yellow)}
 
 <div id="sel-ov" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#eef2f8;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;gap:10px">
   <img id="logo-sel" alt="Ching Tech 擎添工業" style="height:120px;margin-bottom:10px">
-  <div style="font-size:24px;font-weight:700;color:var(--accent)">欣興電子 AGV 模擬系統</div>
+  <div style="font-size:24px;font-weight:700;color:var(--accent)">流程計算系統</div>
   <div style="color:var(--dim);font-size:14px;margin-bottom:24px">選擇要模擬的製程線</div>
   <div id="sel-lines" style="display:flex;gap:24px;flex-wrap:wrap;justify-content:center;max-width:90vw"></div>
 </div>
@@ -614,6 +634,136 @@ const BLUEPRINTS = {
       simple:{ rows:[[0,1,2,3,4,5],[6,7,8,9,10]], rowY:[250,510], rowTrack:[[165,185],[425,445]], viewBox:'-20 0 1500 660', legendY:628 } },
   },
 };
+// ── PLS 製程線（H05 5F 平面圖 AGV 動線點 ①→⑬）──────────────────────────────
+// 13 站的 spine/routeParams/groups/defaults 由這張表推出，省掉一大坨樣板。
+// [名稱, 型態, 預設值, 選項]；buffer 的值＝容量(框)，其餘＝處理時間(秒)
+// xi   ＝ 現場欄位（不是流程順序）：同一台／相鄰的機台排同一欄或並排，圖才不會拉長
+//         欄位順序 ① ② ③ ⑧⑫ ④ ⑤⑨ ⑥ ⑦⑪ ⑩ ⑬（③⑧ 相鄰、⑤⑨/⑦⑪/⑧⑫ 同欄疊放）
+// same:i ＝ 跟第 i 站是同一台實體設備 → 參數共用、產能共用、彼此距離 0
+// pt   ＝ 該點在 H05 5F 平面圖上的座標(PDF pt)，用來算走行距離；n＝並聯台數
+// selfReturn ＝ 空框不回上游，而是在站內從入料端搬到出料端（例：⑧ 回 ⑧）
+// dropEmpty  ＝ 退下來的空框由人員收走（線尾）
+const PLS_STNS=[
+  ['① 上下料機(進板)',   'refill',  360, {xi:0, pt:[528,228], noReturn:true}], // 人員投料，不收空框
+  ['② PLG PRC (8爐)',    'buffer',  8,   {xi:1, pt:[549,139]}],
+  ['③ 左線體(北入/南出)','transfer',360, {xi:2, pt:[320,143], selfReturn:true}],
+  ['④ PLG BAK (8爐)',    'buffer',  8,   {xi:4, pt:[ 35,137]}],
+  ['⑤⑨ 板件庫(暫存架)', 'transfer',360, {xi:5, pt:[323,467], selfReturn:true}],
+  ['⑥ 垂直式塞孔機',     'transfer',360, {xi:6, pt:[309,349], n:2, selfReturn:true}],
+  ['⑦⑪ PLG BAK (16爐)', 'buffer',  16,  {xi:7, pt:[538,316]}],
+  ['⑧⑫ 研磨線(北入/南出)','transfer',360,{xi:3, pt:[358,169], selfReturn:true}],
+  ['⑨ 板件庫(第2次)',    'transfer',360, {xi:5, same:4, selfReturn:true}],
+  ['⑩ 工作桌(檢視)',     'transfer',360, {xi:8, pt:[445,372], n:2, selfReturn:true}],
+  ['⑪ PLG BAK (第2次)',  'buffer',  16,  {xi:7, same:6}],
+  ['⑫ 研磨線(第2次)',    'transfer',360, {xi:3, same:7, selfReturn:true}],
+  ['⑬ 出料換框機',       'changer', 360, {xi:9, pt:[158,493], dropEmpty:true}],
+];
+// AGV 分隊：一隊管好幾段。half:'A'＝只做 來源→烤箱，'B'＝只做 烤箱→目的
+// selfRet ＝ 這一隊負責哪些站的「站內空框回程」（出料端要的空框＝自己入料端退下來的）
+const PLS_TEAMS=[
+  {n:2, label:'①→②烤箱→③',              legs:[[0,2,1]]},
+  {n:2, label:'③→④烤箱＋③⑧⑫ 站內回空框', legs:[[2,4,3,'A']], selfRet:[2,7,11]},
+  {n:2, label:'④烤箱→⑤、⑧→⑨、⑫→⑬',     legs:[[2,4,3,'B'],[7,8],[11,12]]},
+  {n:1, label:'⑤→⑥、⑨→⑩',              legs:[[4,5],[8,9]]},
+  {n:2, label:'⑥→⑦烤箱→⑧、⑩→⑪烤箱→⑫', legs:[[5,7,6],[9,11,10]]},
+  {n:1, label:'⑤⑨⑥⑩ 站內回空框',        legs:[], selfRet:[4,8,5,9]},
+];
+// 圖上 1pt 換算多少秒的走行時間（含起停/轉彎）。整條線的距離比例都照平面圖，只有這個係數是估的
+const PLS_PT2SEC=0.5;
+BLUEPRINTS.pls = (function(){
+  const id='pls', D={}, spine=[], routeParams=[];
+  const XI=PLS_STNS.map(([,,,o])=>o.xi), NX=Math.max(...XI)+1;          // 現場欄位數
+  const own=PLS_STNS.map(([,,,o],i)=> o.same!=null ? o.same : i);       // 參數來自哪一站
+  const shared=new Set(own.filter((v,i)=>v!==i));
+  const PT=[];                                                          // 每欄在平面圖上的座標
+  PLS_STNS.forEach(([name,type,val,opt],i)=>{
+    const p=own[i], mine=(p===i), x=opt.xi;
+    const c={role:'s'+i, type, name, xi:x};
+    if(!mine) c.alias=true;              // 第二次經過同一台：只是流程上的另一步，不再畫一台機台
+    if(opt.noReturn) c.noReturn=true;
+    if(opt.dropEmpty) c.dropEmpty=true;
+    // 站內回空框：⑤⑨、⑧⑫ 是同一台，共用同一個時間參數
+    if(opt.selfReturn){ c.selfReturn=true; c.selfRetKey=`${id}_r${p}`; if(mine) D[c.selfRetKey]=30; }
+    if(opt.pt) PT[x]=opt.pt;
+    if(shared.has(p)) c.share='eq'+p;                                   // 同一台設備 → 產能共用
+    if(type==='buffer'){ c.bufKey=`${id}_b${p}`; if(mine) D[c.bufKey]=val; }
+    else{
+      c.procKey=`${id}_p${p}`; if(mine) D[c.procKey]=val;
+      if(type!=='refill'){ c.countKey=`${id}_n${p}`; if(mine) D[c.countKey]=opt.n||1; }
+      // 起始收空框：預設每台機台的出料端先備一個空框（畫面上點那一格可切換）
+      if(type==='transfer'){ c.seedKey=`${id}_s${i}`; D[c.seedKey]=1; }
+    }
+    spine.push(c);
+  });
+  // 走行時間＝AGV 實際沿走道要走的長度（aisles-h05.js 從平面圖綠線算出），沒資料才退回直線
+  const AIS=(typeof PLS_AISLES!=='undefined')?PLS_AISLES:null;
+  const aislePath=(a,b)=>AIS && (AIS.paths[`${Math.min(a,b)}_${Math.max(a,b)}`]||null);
+  const secs=(a,b)=>{
+    const p=aislePath(a,b);
+    const d=p ? p.len : Math.hypot(PT[a][0]-PT[b][0], PT[a][1]-PT[b][1]);
+    return Math.max(10, Math.round(d*PLS_PT2SEC));
+  };
+  const colName=x=>(PLS_STNS.find((s,i)=>XI[i]===x && own[i]===i)||[''])[0].split(' ')[0];
+  const addRoute=(a,b)=>{                                               // 相鄰欄＝段，非相鄰＝直達捷徑
+    const lo=Math.min(a,b), hi=Math.max(a,b);
+    const adj=(hi===lo+1), k=adj?`${id}_seg${lo}`:`${id}_d${lo}_${hi}`;
+    if(k in D) return;
+    routeParams.push({key:k, label:`${colName(lo)} ↔ ${colName(hi)}${adj?'':' 直達'}`,
+      seg:adj?('s'+lo):`d${lo}_${hi}`, pair:[lo,hi]});
+    D[k]=secs(lo,hi);
+  };
+  // 只替實際會發生的搬運動線開參數；其餘站間距離走 fallbackSec（照平面圖走道算）
+  const groups=PLS_TEAMS.map((t,ti)=>{
+    const agvKey=`${id}_g${ti}`; D[agvKey]=t.n;
+    const legs=t.legs.map(([a,b,mid,half])=>{
+      const l={src:'s'+a, dst:'s'+b, priA:8};
+      if(mid!=null){ l.mid='s'+mid; l.priB=9; l.midSpace='pending'; }
+      if(half) l.half=half;
+      // 只登記實際會走到的路徑。來源站自己回空框（或人員投料）就沒有跨站回程那條
+      const crossRet = !(PLS_STNS[a][3].selfReturn || PLS_STNS[a][3].noReturn);
+      if(mid!=null){
+        if(half!=='B') addRoute(XI[a], XI[mid]);                        // 來源→烤箱
+        if(half!=='A') addRoute(XI[mid], XI[b]);                        // 烤箱→目的
+        if(half!=='B' && crossRet) addRoute(XI[a], XI[b]);              // 跨站空框回程（跳過烤箱）
+      } else {
+        addRoute(XI[a], XI[b]);
+      }
+      return l;
+    });
+    return {grp:ti+1, agvKey, agvLabel:`AGV G${ti+1}（${t.label}）`, legs,
+            selfRet:(t.selfRet||[]).map(i=>'s'+i)};
+  });
+  // 底色帶：一欄一條，塗「在這一欄取料的那一隊」的顏色 → 同隊相鄰欄自然連成一片
+  const at=(x,i)=>XI[i]===x;
+  const zones=[], zoneGrp=[];
+  for(let x=0;x<NX;x++){
+    let t=PLS_TEAMS.findIndex(T=>T.legs.some(([a])=>at(x,a)));
+    if(t<0) t=PLS_TEAMS.findIndex(T=>T.legs.some(([,,m])=>m!=null&&at(x,m)));
+    if(t<0) t=PLS_TEAMS.findIndex(T=>T.legs.some(([,b])=>at(x,b)));
+    zones.push([x,x]); zoneGrp.push(t+1);
+  }
+  Object.assign(D,{pls_bt:1, pls_pk:0, pls_dp:0, pls_bpk:0, pls_bdp:0});
+  Object.assign(DEF,D); Object.assign(P,D); // 內建線：defaults 直接併入全域參數
+  // 畫布＝整張平面圖。PDF 這一頁是 rotate 270，pt 座標要先轉正才會跟底圖對齊（係數由圖上實測擬合）
+  // S 只影響畫面大小，不影響走行時間（旋轉不改變距離）
+  const S=5, PW=792, PH=612;
+  const pos=PT.map(([tx,ty])=>[Math.round((1.011*ty+6.5)*S), Math.round((594-0.993*tx)*S)]);
+  const W=PW*S, H=PH*S;
+  const cols=[...Array(NX).keys()], half=Math.ceil(NX/2); // 精簡視圖對半折兩列
+  return {
+    id, name:'PLS 製程線', color:'#2e8b57', sinkRole:'s'+(PLS_STNS.length-1),
+    flowSummary:'①上下料 → ②PRC → ③線體 → ④BAK → ⑤板件庫 → ⑥塞孔 → ⑦BAK → ⑧研磨 → ⑨ → ⑩檢視 → ⑪BAK → ⑫ → ⑬出料',
+    batchKey:'pls_bt', pickKey:'pls_pk', dropKey:'pls_dp', bufPickKey:'pls_bpk', bufDropKey:'pls_bdp',
+    routeParams, spine, groups, defaults:D, schemaVersion:1,
+    fallbackSec:secs,   // 未列為參數的站間距離，一律照平面圖走道算
+
+    layout:{ type:'plan', pos, xiCount:NX, zones, zoneGrp, planScale:S,
+      aisles:AIS?AIS.segs:null, paths:AIS?AIS.paths:null,   // AGV 走道網與站間路徑
+      bg:{href:'plan-h05.png', w:W, h:H},   // H05 5F 平面圖（淡化後）當底圖
+      header:'PLS 製程線（H05 5F 平面配置）', baseVB:`0 0 ${W} ${H}`,
+      simple:{ rows:[cols.slice(0,half), cols.slice(half)], rowY:[250,510], rowTrack:[[165,185],[425,445]], viewBox:'-20 0 1500 660', legendY:628 } },
+  };
+})();
 function clampInt(v,lo,hi){ v=Math.round(+v||lo); return Math.max(lo,Math.min(hi,v)); }
 // 依藍圖 + 數量參數產生站別清單與「角色→索引」對照
 function genDefs(bp){
@@ -622,30 +772,56 @@ function genDefs(bp){
     const n = col.countKey ? clampInt(P[col.countKey],1,9) : 1;
     byRole[col.role]=[];
     for(let k=0;k<n;k++){
-      const idx=defs.length, d={xi:col.xi, sub:k};
+      const idx=defs.length, d={xi:col.xi, sub:(col.subBase||0)+k}; // subBase：同一欄放多站時往下疊
       if(col.type==='buffer'){
         d.name=col.name; d.buf=Math.max(1, P[col.bufKey]|0); if(col.holdTime) d.holdTime=col.holdTime;
       } else {
         d.name = col.countKey ? `${col.name}_${k+1}` : col.name;
         d.mtype = col.type; // refill / transfer / changer
       }
+      if(col.noReturn) d.noReturn=true; // 此站不收空框（人員投料）
+      if(col.share) d.share=col.share;  // 同標籤＝同一台實體設備（產能共用）
+      if(col.alias) d.alias=true;       // 同一台設備的第二個製程步驟：不另外畫一台
+      if(col.selfReturn){ d.selfReturn=true; d.selfRetKey=col.selfRetKey||null; } // 空框在站內從入料端搬到出料端
+      if(col.seedKey) d.seedKey=col.seedKey;   // 起始收空框：0=一開始沒空框、1=一開始就有
+      if(col.dropEmpty)  d.dropEmpty=true;   // 退下來的空框由人員收走
       defs.push(d); byRole[col.role].push(idx);
     }
   }
   return {defs, byRole};
 }
+// 一組 AGV 可以管好幾段（legs）；沒寫 legs 就是舊的「一組一段」
+// leg.half：'A'=只做 來源→烤箱（含空框回程）、'B'=只做 烤箱→目的、省略=整段都做
+function bpLegs(g){ return g.legs || [g]; }
 function genGroups(bp, byRole){
-  return bp.groups.map(g=>({
-    grp:g.grp, src:byRole[g.src], dst:byRole[g.dst],
-    mid: g.mid!=null ? byRole[g.mid][0] : null,
-    priA:g.priA, priB:g.priB, midSpace:g.midSpace,
-  }));
+  return bp.groups.map(g=>{
+    // 任務清單模式（平面版面自訂線）：一隊就是一串「哪一站→哪一站、滿框還空框」
+    if(g.tasks) return {
+      grp:g.grp, agvKey:g.agvKey, legs:[],
+      tasks: g.tasks.filter(t=>byRole[t.f]&&byRole[t.t])
+                    .map(t=>({f:byRole[t.f], t:byRole[t.t], c:t.c||'full',
+                              self:t.f===t.t, pri:t.pri, space:t.space})),
+    };
+    return {
+    grp:g.grp, agvKey:g.agvKey,
+    selfRet: (g.selfRet||[]).flatMap(r=>byRole[r]||[]),
+    legs: bpLegs(g).map(l=>({
+      src:byRole[l.src], dst:byRole[l.dst],
+      mid: l.mid!=null ? byRole[l.mid][0] : null,
+      half:l.half||null, priA:l.priA, priB:l.priB, midSpace:l.midSpace,
+    })),
+    };
+  });
 }
 function genAgvs(bp, byRole){
   const agvs=[]; let gi=0;
   for(const g of bp.groups){
     const n=clampInt(P[g.agvKey],1,9);
-    const pool=[...byRole[g.src], ...(g.mid!=null?byRole[g.mid]:[]), ...byRole[g.dst]];
+    const pool=[];
+    for(const t of (g.tasks||[])) pool.push(...(byRole[t.f]||[]), ...(byRole[t.t]||[]));
+    for(const l of (g.legs||[])) pool.push(...byRole[l.src], ...(l.mid!=null?byRole[l.mid]:[]), ...byRole[l.dst]);
+    if(!g.legs && !g.tasks) pool.push(...byRole[g.src], ...(g.mid!=null?byRole[g.mid]:[]), ...byRole[g.dst]);
+    for(const r of (g.selfRet||[])) pool.push(...(byRole[r]||[]));   // 只做站內回程的車，起點放在那些站
     for(let k=0;k<n;k++){ agvs.push({id:'A'+(gi+1), pos:pool[k%pool.length], stag:gi*30, grp:g.grp}); gi++; }
   }
   return agvs;
@@ -667,10 +843,13 @@ function genRoute(bp){
     if(b===a+1) seg[a]=rp.key; else direct[`${a}_${b}`]=rp.key;
   }
   return (i,j)=>{
+    if(i===j) return P[abfSt[i]?.selfRetKey]||0;   // 站內回程：入料端→出料端
     const xi=abfSt[i]?.xi ?? i, xj=abfSt[j]?.xi ?? j;
     if(xi===xj) return 0;
     const a=Math.min(xi,xj), b=Math.max(xi,xj), dk=`${a}_${b}`;
     if(dk in direct) return P[direct[dk]]||0;
+    // 沒開參數的組合（AGV 空車去取料會走到）：有平面圖距離就直接用，不要沿欄位硬加總
+    if(bp.fallbackSec && (b>a+1 || seg[a]===undefined)) return bp.fallbackSec(a,b);
     let d=0; for(let k=a;k<b;k++) d+=(P[seg[k]]||0);
     return d;
   };
@@ -683,6 +862,11 @@ function genProcTime(bp){
 // 依當前 P 產生完整 line config（取代寫死的 LINES）；可傳 line id 或 blueprint 物件
 function buildLineConfig(lineOrBp){
   const bp = (lineOrBp && typeof lineOrBp==='object') ? lineOrBp : (BLUEPRINTS[lineOrBp] || BLUEPRINTS.abf);
+  // 平面版面又沒自帶距離表 → 用圖上兩點直線距離換算走行時間
+  if(!bp.fallbackSec && bp.layout && bp.layout.type==='plan' && bp.layout.pos){
+    const p=bp.layout.pos, k=bp.layout.secPerUnit||0.1;
+    bp.fallbackSec=(a,b)=>(p[a]&&p[b]) ? Math.max(5,Math.round(Math.hypot(p[a][0]-p[b][0],p[a][1]-p[b][1])*k)) : 0;
+  }
   const {defs, byRole} = genDefs(bp);
   return { id:bp.id, name:bp.name, defs, route:genRoute(bp), procTime:genProcTime(bp),
            agvInits:genAgvs(bp, byRole), groups:genGroups(bp, byRole), layout:genLayout(bp, defs),
@@ -712,7 +896,12 @@ function loadCustomLines(){
   }catch(_){}
 }
 function saveCustomLines(){
-  try{ localStorage.setItem(LINE_STORE_KEY, JSON.stringify(Object.values(BLUEPRINTS).filter(b=>b.custom))); }catch(_){}
+  try{ localStorage.setItem(LINE_STORE_KEY, JSON.stringify(Object.values(BLUEPRINTS).filter(b=>b.custom))); return true; }
+  catch(e){
+    // 多半是底圖太大撐爆瀏覽器配額。以前這裡是靜靜吞掉，結果重整後線就不見了
+    toast('自訂線存不進瀏覽器（底圖太大？）：'+((e&&e.name)||e)+'　請用 ⬇ 匯出成 JSON 備份','err');
+    return false;
+  }
 }
 function deleteCustomLine(id){
   const bp=BLUEPRINTS[id]; if(!bp||!bp.custom) return false;
@@ -734,16 +923,44 @@ function validateBlueprint(bp){
   if(!groups.length) errs.push('沒有搬運群組');
   groups.forEach((g,i)=>{
     const gn=g.grp||i+1;
-    if(!(g.src in roleType)) errs.push(`群組 ${gn} 來源角色不存在：${g.src}`);
-    if(!(g.dst in roleType)) errs.push(`群組 ${gn} 目的角色不存在：${g.dst}`);
-    if(g.mid!=null && !(g.mid in roleType)) errs.push(`群組 ${gn} 緩衝角色不存在：${g.mid}`);
+    for(const t of (g.tasks||[])){
+      if(!(t.f in roleType)) errs.push(`群組 ${gn} 任務來源站不存在：${t.f}`);
+      if(!(t.t in roleType)) errs.push(`群組 ${gn} 任務目的站不存在：${t.t}`);
+      if(t.c==='empty' && roleType[t.t]==='buffer') errs.push(`群組 ${gn}：烤箱不會收空框（${t.t}）`);
+      if(t.c!=='empty' && t.f===t.t) errs.push(`群組 ${gn}：滿框任務的來源和目的不能是同一站`);
+    }
+    if(g.tasks) return;
+    for(const l of bpLegs(g)){
+      if(!(l.src in roleType)) errs.push(`群組 ${gn} 來源角色不存在：${l.src}`);
+      if(!(l.dst in roleType)) errs.push(`群組 ${gn} 目的角色不存在：${l.dst}`);
+      if(l.mid!=null && !(l.mid in roleType)) errs.push(`群組 ${gn} 緩衝角色不存在：${l.mid}`);
+    }
     const an=bp.defaults?bp.defaults[g.agvKey]:undefined;
     if(g.agvKey && an!=null && an<1) errs.push(`群組 ${gn} AGV 數量需 ≥1`);
   });
-  if(groups.length){
-    if(roleType[groups[0].src]!=='refill') errs.push('首組來源必須是補料站(refill)');
-    if(roleType[groups[groups.length-1].dst]!=='changer') errs.push('末組目的必須是計產站(changer)');
-    for(let i=1;i<groups.length;i++) if(groups[i].src!==groups[i-1].dst) errs.push(`群組 ${i}→${i+1} 未銜接（${groups[i-1].dst} ≠ ${groups[i].src}）`);
+  // 任務清單模式：流程由任務自由組成，不做線性銜接檢查（能不能出料交給乾跑判斷）
+  if(groups.some(g=>g.tasks)){
+    const src=new Set(), dst=new Set();
+    for(const g of groups) for(const t of (g.tasks||[])){ if(t.c!=='empty'){ src.add(t.f); dst.add(t.t); } }
+    for(const c of spine){
+      if(c.type!=='buffer' && c.type!=='refill' && !dst.has(c.role)) errs.push(`${c.name} 沒有任何任務會送滿框進來`);
+      if(c.type!=='changer' && !src.has(c.role)) errs.push(`${c.name} 出的滿框沒有任務會來收`);
+    }
+    return {ok:errs.length===0, errors:errs};
+  }
+  // 銜接檢查：從補料站沿著段一路走，要走完所有段並停在計產站（站位順序不必等於流程順序）
+  const seen={}, nextOf={}; let nLegs=0;
+  for(const g of groups) for(const l of bpLegs(g)){
+    const k=`${l.src}>${l.dst}`; if(seen[k]) continue; seen[k]=1; nLegs++;
+    if(nextOf[l.src]) errs.push(`站別 ${l.src} 有兩條不同的下一段`);
+    nextOf[l.src]=l.dst;
+  }
+  const start=(spine.find(c=>c.type==='refill')||{}).role;
+  if(start && nLegs){
+    let cur=start, hops=0;
+    while(nextOf[cur] && hops<=nLegs){ cur=nextOf[cur]; hops++; }
+    if(hops!==nLegs) errs.push(`搬運段沒有全部串成一條鏈（走到 ${hops}/${nLegs} 段就斷了）`);
+    if(roleType[cur]!=='changer') errs.push('最後一段目的必須是計產站(changer)');
   }
   return {ok:errs.length===0, errors:errs};
 }
@@ -809,29 +1026,71 @@ function addCustomLine(bp){
 // ── 通用群組任務產生器（取代 getGroup1/2/3Tasks，支援 2 站直送）──
 // 站別型態判斷（用於來源出滿框 / 來源收空框 / 目的入料 / 目的退空框）
 function srcOutFull(s){ return s.mtype==='refill' ? (s.s_out && !s.s_out_res) : (s.out_full && !s.out_full_hold && !s.out_full_res); }
-function srcRecvFree(s){ return s.mtype==='refill' ? (s.s_recv===0 && !s.s_recv_res) : (s.out_recv===0 && !s.out_recv_res); }
+// noReturn＝人員投料站；selfReturn＝空框自己在站內從入料端搬到出料端。兩者都不收別站送來的空框
+function srcRecvFree(s){ return (s.noReturn||s.selfReturn) ? false
+  : s.mtype==='refill' ? (s.s_recv===0 && !s.s_recv_res) : (s.out_recv===0 && !s.out_recv_res); }
+// 站內回程：入料端有退空框，且出料端整條（收框位＋放置位）都空
+// 出料端只要還壓著一個空框就不能再送，否則框會愈積愈多，最後入料端退不出來而卡死
+function selfRetReady(s){ return !!s.selfReturn && s.in_ret && !s.in_ret_hold && !s.in_ret_res
+  && s.out_recv===0 && !s.out_recv_res && !s.out_proc; }
 function dstInFree(s){ return s.in_full===0 && !s.in_full_res; }
 function dstRetAvail(s){ return s.in_ret && !s.in_ret_hold && !s.in_ret_res; }
+// 共用設備：同 share 標籤的站別其實是同一台，容量/產能要合起來算
+function shareMates(s){ return s.share ? abfSt.filter(o=>o.share===s.share) : [s]; }
+function shareBusy(s){ return !!s.share && shareMates(s).some(o=>o!==s && o.machineActive); }
 function midHasSpace(buf, mode){
   if(mode==='none') return true;
-  if(mode==='avail') return buf.fullAvail < buf.buf;
-  return buf.fullAvail + buf.pendingFrames.length < buf.buf; // 'pending'（預設）
+  const m=shareMates(buf);
+  const avail=m.reduce((n,o)=>n+o.fullAvail,0);
+  if(mode==='avail') return avail < buf.buf;
+  return avail + m.reduce((n,o)=>n+o.pendingFrames.length,0) < buf.buf; // 'pending'（預設）
 }
 function genGroupTasks(g){
+  const T=(g.tasks?genFreeTasks(g):g.legs.flatMap(genLegTasks));
+  // 站內空框回程：出料端要用的空框就是自己入料端退下來的那個（例：⑧ 回 ⑧）
+  for(const si of (g.selfRet||[]))
+    if(selfRetReady(abfSt[si])) T.push({f:si, t:si, c:'empty', pri:10});
+  return T;
+}
+// 任務清單模式：直接照「哪一站→哪一站、滿框還空框」判斷可不可以出車
+// 來源/目的都可能有多台並聯機台，取第一個可用的
+function genFreeTasks(g){
+  const s=abfSt, T=[];
+  for(const t of g.tasks){
+    for(const fi of t.f){
+      if(t.c==='empty'){
+        if(t.self){                                                 // 站內回空框（⑧→⑧）
+          if(selfRetReady(s[fi])) T.push({f:fi,t:fi,c:'empty',pri:t.pri||10});
+          continue;
+        }
+        if(!dstRetAvail(s[fi])) continue;
+        const ti=t.t.find(i=>i!==fi && srcRecvFree(s[i]));
+        if(ti!=null){ T.push({f:fi,t:ti,c:'empty',pri:t.pri||10}); break; }
+        continue;
+      }
+      const a=s[fi];
+      if(!(a.buf ? (a.fullAvail>a.fullReserved) : srcOutFull(a))) continue;
+      const ti=t.t.find(i=>{ const b=s[i]; return b.buf ? midHasSpace(b, t.space||'pending') : dstInFree(b); });
+      if(ti!=null){ T.push({f:fi,t:ti,c:'full',pri:t.pri||8}); break; }
+    }
+  }
+  return T;
+}
+function genLegTasks(g){
   const s = abfSt; // 當前作用線狀態
   const T = [];
   if(g.mid!=null){
     const buf = s[g.mid];
     // A：各來源出滿框 → 緩衝（緩衝有空間）
-    for(const si of g.src)
+    if(g.half!=='B') for(const si of g.src)
       if(srcOutFull(s[si]) && midHasSpace(buf, g.midSpace))
         T.push({f:si, t:g.mid, c:'full', pri:g.priA});
     // B：緩衝 → 任一空的目的入料
-    for(const di of g.dst)
+    if(g.half!=='A') for(const di of g.dst)
       if(buf.fullAvail > buf.fullReserved && dstInFree(s[di]))
         T.push({f:g.mid, t:di, c:'full', pri:g.priB});
-    // C：各目的退空框 → 任一來源收空框（取第一個）
-    for(const di of g.dst)
+    // C：各目的退空框 → 任一來源收空框（取第一個）；跟著 A 半段走
+    if(g.half!=='B') for(const di of g.dst)
       if(dstRetAvail(s[di]))
         for(const si of g.src)
           if(srcRecvFree(s[si])){ T.push({f:di, t:si, c:'empty', pri:10}); break; }
@@ -930,6 +1189,13 @@ function computeGeom(L){
         out[idx]={x:Math.round(x), y, tfy:tf, tyr:tr};
       });
     });
+  } else if(lay.type==='plan'){
+    // 平面圖版面：座標直接來自現場圖，AGV 走兩點之間的直線（去程走上方、回程走下方）
+    L.defs.forEach((d,i)=>{
+      // 同位置多台機並排（平面圖上本來就是左右並排，不是上下疊）
+      const p=lay.pos[d.xi]||[0,0], x=p[0]+(d.sub||0)*190, y=p[1];
+      out[i]={x, y, tfy:y, tyr:y};   // 走道折線自己決定路徑，不用上下分軌
+    });
   } else { // 'row'
     const gap=lay.gap || (EX-SX)/(lay.xiCount-1);
     L.defs.forEach((d,i)=>{
@@ -946,13 +1212,20 @@ function buildSimState(lc){
     const xi  = d.xi  !== undefined ? d.xi  : i;
     const sub = d.sub !== undefined ? d.sub : 0;
     const g   = _geom[i];
-    const base={name:d.name,x:g.x,y:g.y,tfy:g.tfy,tyr:g.tyr,xi,sub,mtype:d.mtype||null,buf:d.buf||0,sink:d.sink||false};
+    const base={name:d.name,x:g.x,y:g.y,tfy:g.tfy,tyr:g.tyr,xi,sub,mtype:d.mtype||null,buf:d.buf||0,sink:d.sink||false,noReturn:!!d.noReturn,share:d.share||null,alias:!!d.alias,
+      selfReturn:!!d.selfReturn,dropEmpty:!!d.dropEmpty,selfRetKey:d.selfRetKey||null,seedKey:d.seedKey||null};
     const pt = lc.procTime(d);
     if(d.mtype==='refill'){
       return {...base, s_recv:1, s_recv_res:0, s_proc:1, s_out:1, s_out_res:0, processTime:pt, machineActive:true, machineTimer:pt};
     } else if(d.mtype==='transfer'){
-      return {...base, in_full:0, in_full_res:0, in_proc:0, in_ret:1, in_ret_hold:0, in_ret_res:0,
-        out_recv:1, out_recv_res:0, out_proc:1, out_full:0, out_full_hold:0, out_full_res:0, processTime:pt, machineActive:false, machineTimer:0};
+      // 站內回空框的機台只放一個起始空框在出料端：入料端退框位要留空，否則第一輪就沒地方退
+      const self=!!d.selfReturn;
+      // 起始收空框可由參數指定：1＝收空框位先放一個空框（會照正常流程進放置位），0＝兩格都空
+      // 沒有 seedKey 的線（ABF/SMK）維持原本的起始狀態
+      const hasSeed=d.seedKey!=null, seed=hasSeed?(P[d.seedKey]?1:0):0;
+      return {...base, in_full:0, in_full_res:0, in_proc:0, in_ret:self?0:1, in_ret_hold:0, in_ret_res:0,
+        out_recv:hasSeed?seed:(self?0:1), out_recv_res:0, out_proc:hasSeed?0:1,
+        out_full:0, out_full_hold:0, out_full_res:0, processTime:pt, machineActive:false, machineTimer:0};
     } else if(d.mtype==='changer'){
       return {...base, in_full:0, in_full_res:0, in_proc:0, in_ret:1, in_ret_hold:0, in_ret_res:0, in_full_wait:0, machineActive:false, machineTimer:0, processTime:pt};
     } else if(d.buf){
@@ -1016,6 +1289,7 @@ function updateABFMachines(dt){
     if(!s.mtype) continue;
 
     if(s.mtype==='refill'){
+      if(s.noReturn) s.s_recv=1; // 人員投料：不等 AGV 送空框回來，料源視為永遠備妥
       // Auto-feed: 收空框位 →(5s)→ 空框放置位 → 機器開始
       if(s.s_recv && !s.s_proc){
         s.recv_wait = (s.recv_wait||0) + dt;
@@ -1054,7 +1328,7 @@ function updateABFMachines(dt){
       } else { s.out_recv_wait=0; }
 
       // 拿料位 + 放置位 都有框，且退空框和出滿框都空 → 才啟動機器
-      if(!s.machineActive && s.in_proc && s.out_proc && !s.in_ret && !s.out_full){
+      if(!s.machineActive && s.in_proc && s.out_proc && !s.in_ret && !s.out_full && !shareBusy(s)){
         s.machineActive=true; s.machineTimer=s.processTime;
       }
 
@@ -1095,6 +1369,9 @@ function updateABFMachines(dt){
       }
     }
   }
+  // dropEmpty：這一站退下來的空框由人員就地收走（線頭/線尾），不派 AGV
+  for(const s of abfSt)
+    if(s.dropEmpty && s.in_ret && !s.in_ret_hold && !s.in_ret_res) s.in_ret=0;
   // Buffer hold 計時：框放入緩衝區後等待 holdTime 秒才能被取走
   for(const s of abfSt){
     if(!s.buf || !s.pendingFrames.length) continue;
@@ -1128,12 +1405,19 @@ function stPiled(s){
 function servingGroupForPile(i){
   const s=abfSt[i]; if(!s||!LC.groups) return null;
   const G=LC.groups;
-  if(s.buf)               return G.find(g=>g.mid===i)||null;               // 緩衝滿載 → 該緩衝所屬組
-  if(s.mtype==='changer') return G.find(g=>(g.dst||[]).includes(i))||null; // 退空框 → dst 組
-  if(s.mtype==='refill')  return G.find(g=>(g.src||[]).includes(i))||null; // 出滿框 → src 組
-  if(s.out_full) return G.find(g=>(g.src||[]).includes(i))||null;          // transfer 出滿框 → src 組
-  if(s.in_ret)   return G.find(g=>(g.dst||[]).includes(i))||null;          // transfer 退空框 → dst 組
-  return G.find(g=>(g.src||[]).includes(i))||null;
+  // 任務清單模式：誰的任務碰到這一站就算誰的
+  const byTask=(pick)=>G.find(g=>(g.tasks||[]).some(pick))||null;
+  if(G.some(g=>g.tasks)){
+    if(s.buf || s.out_full || s.mtype==='refill') return byTask(t=>t.f.includes(i)) || byTask(t=>t.t.includes(i));
+    return byTask(t=>t.t.includes(i)) || byTask(t=>t.f.includes(i));
+  }
+  const has=(f)=>G.find(g=>g.legs.some(f))||null;
+  if(s.buf)               return has(l=>l.mid===i);              // 緩衝滿載 → 該緩衝所屬組
+  if(s.mtype==='changer') return has(l=>l.dst.includes(i));      // 退空框 → dst 組
+  if(s.mtype==='refill')  return has(l=>l.src.includes(i));      // 出滿框 → src 組
+  if(s.out_full) return has(l=>l.src.includes(i));               // transfer 出滿框 → src 組
+  if(s.in_ret)   return has(l=>l.dst.includes(i));               // transfer 退空框 → dst 組
+  return has(l=>l.src.includes(i));
 }
 function groupUtil(grp){
   let act=0,den=0;
@@ -1148,7 +1432,7 @@ function diagnoseBottleneck(i){
   const g=(s.pileGrp?(LC.groups||[]).find(x=>x.grp===s.pileGrp):null)||servingGroupForPile(i);
   if(!g) return {cause:'unknown', text:'建議檢視該站前後段配置'};
   const util=groupUtil(g.grp), pct=Math.round(util*100), gname='G'+g.grp;
-  const agvKey=(bp.groups&&bp.groups[g.grp-1])?bp.groups[g.grp-1].agvKey:null;
+  const agvKey=g.agvKey||null;
   if(util>=UTIL_HIGH && agvKey){
     return {cause:'agv',grp:g.grp,util,key:agvKey,cur:clampInt(P[agvKey],1,9),
       text:`服務的 ${gname} AGV 吃滿（稼動 ${pct}%）→ 缺車，建議該組 AGV +1`};
@@ -1441,7 +1725,7 @@ function buildSVG(){
 // 依 layout.simple 計算各 xi 欄位的位置與軌道錨點，多機台(同 xi)合併為一欄
 function xiColumns(){
   const lay=LC.layout.simple;
-  const byXi={}; abfSt.forEach((s,i)=>{(byXi[s.xi]=byXi[s.xi]||[]).push(i);});
+  const byXi={}; abfSt.forEach((s,i)=>{ if(!s.alias) (byXi[s.xi]=byXi[s.xi]||[]).push(i); });
   const cols=Object.keys(byXi).map(Number).sort((a,b)=>a-b).map(xi=>({xi,members:byXi[xi],rep:byXi[xi][0]}));
   const GAP=(EX-SX)/(Math.max(...lay.rows.map(r=>r.length))-1);
   lay.rows.forEach((row,r)=>{
@@ -1636,6 +1920,35 @@ function makeSlot(g, cx, cy, id, label, sw, sh){
   l.textContent=label; g.appendChild(l);
 }
 
+// 「收空框」格子上疊一層可點的透明區：切換這一站一開始有沒有空框，改完直接重跑
+function makeSeedToggle(g, i, s, cx, cy){
+  if(!s.seedKey) return;
+  const hit=ns('rect');
+  hit.setAttribute('x',cx-19); hit.setAttribute('y',cy-19);
+  hit.setAttribute('width',38); hit.setAttribute('height',38); hit.setAttribute('rx',6);
+  hit.setAttribute('fill','transparent'); hit.setAttribute('style','cursor:pointer');
+  hit.setAttribute('id',`abf-seed-${i}`);
+  const ttl=ns('title'); ttl.textContent='點一下切換：這一站一開始有／沒有空框'; hit.appendChild(ttl);
+  hit.addEventListener('click',ev=>{ ev.stopPropagation(); toggleSeedEmpty(i); });
+  g.appendChild(hit);
+  // 右上角小圓點，標示目前設定（實心＝一開始有空框）
+  const dot=ns('circle');
+  dot.setAttribute('cx',cx+15); dot.setAttribute('cy',cy-15); dot.setAttribute('r','4.5');
+  dot.setAttribute('id',`abf-seeddot-${i}`); dot.setAttribute('stroke','#5a6a85'); dot.setAttribute('stroke-width','1.5');
+  dot.setAttribute('fill', P[s.seedKey] ? '#ff9800' : '#ffffff');
+  g.appendChild(dot);
+}
+function toggleSeedEmpty(i){
+  const s=abfSt[i]; if(!s||!s.seedKey) return;
+  const before=(typeof snapshotStats==='function')?snapshotStats():null;
+  P[s.seedKey] = P[s.seedKey] ? 0 : 1;
+  const fld=document.getElementById('p-'+s.seedKey); if(fld) fld.value=P[s.seedKey];
+  if(typeof persistActiveScenario==='function') persistActiveScenario();
+  resetSim();
+  if(before && typeof showCompareCard==='function') showCompareCard(before,'重新模擬');
+  if(typeof refreshDirty==='function') refreshDirty();
+  toast(`${s.name.replace(/_\d+$/,'')}：一開始${P[s.seedKey]?'有':'沒有'}空框`,'ok');
+}
 function makeArrow(g, x1, y, x2, color){
   const c=color||'#8090aa';
   const ln=ns('line');
@@ -1650,7 +1963,7 @@ function makeArrow(g, x1, y, x2, color){
 }
 
 // Group colour palette (forward track, return track, zone fill, zone stroke, label)
-const GRP_CLR=[
+const GRP_PAL=[
   {fwd:'#2196c4',ret:'#a8d6ea',zone:'#eaf6fb',zs:'#0277bd30',lbl:'#0277bd',name:'G1'},
   {fwd:'#34a865',ret:'#aedcc0',zone:'#ecf8f0',zs:'#00853a30',lbl:'#00853a',name:'G2'},
   {fwd:'#9b59d0',ret:'#d6bdee',zone:'#f4ecfb',zs:'#7b2fbf30',lbl:'#7b2fbf',name:'G3'},
@@ -1658,10 +1971,52 @@ const GRP_CLR=[
   {fwd:'#1aa5a5',ret:'#aee0e0',zone:'#e8f7f7',zs:'#0a808030',lbl:'#0a8080',name:'G5'},
   {fwd:'#d05b86',ret:'#f0c2d4',zone:'#fceef4',zs:'#b03a6630',lbl:'#b03a66',name:'G6'},
 ];
+// 組數不限：超過調色盤就循環用色，名稱一律跟著組序（G7、G8…）
+const GRP_CLR=new Proxy(GRP_PAL,{ get:(a,k)=>{
+  const i=+k; return Number.isInteger(i) ? {...a[i%a.length], name:'G'+(i+1)} : a[k];
+}});
+// 機台方塊的半高（跟 buildABFSVG 畫的尺寸對齊），用來讓 AGV 停在方塊外緣
+function stnHalfH(s){
+  if(s.mtype==='refill')   return 54;   // bh 108
+  if(s.mtype==='transfer') return 84;   // bh 168
+  if(s.mtype==='changer')  return 55;   // bh 110
+  if(s.buf)                return 43;   // bh 86
+  return 54;
+}
+// ── 平面圖版面：兩站之間沿走道的折線（畫線與 AGV 移動共用）──────────────
+// 回傳畫布座標的 [[x,y],…]；沒有走道資料就退回兩點直線
+function planRoute(fi,ti){
+  const a=abfSt[fi], b=abfSt[ti];
+  if(!a||!b) return null;
+  const P0=LC.layout.paths, SC=LC.layout.planScale||1;
+  const key=`${Math.min(a.xi,b.xi)}_${Math.max(a.xi,b.xi)}`;
+  const rec=P0&&P0[key];
+  if(!rec) return [[a.x,a.y],[b.x,b.y]];
+  const pts=rec.p.map(p=>[p[0]*SC,p[1]*SC]);
+  if(a.xi>b.xi) pts.reverse();
+  return [[a.x,a.y], ...pts, [b.x,b.y]];   // 兩端接回機台實際位置
+}
+// 折線上依比例 t(0~1) 取點
+function alongRoute(pts,t){
+  let tot=0; const seg=[];
+  for(let i=0;i<pts.length-1;i++){ const d=Math.hypot(pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1]); seg.push(d); tot+=d; }
+  if(tot<=0) return pts[0];
+  let want=Math.max(0,Math.min(1,t))*tot;
+  for(let i=0;i<seg.length;i++){
+    if(want<=seg[i]||i===seg.length-1){
+      const f=seg[i]>0?want/seg[i]:0;
+      return [pts[i][0]+(pts[i+1][0]-pts[i][0])*f, pts[i][1]+(pts[i+1][1]-pts[i][1])*f];
+    }
+    want-=seg[i];
+  }
+  return pts[pts.length-1];
+}
+// 一個 zone 用哪一組的顏色：一組管多段時由 layout.zoneGrp 指定，否則就是 zone 序
+function zoneGrpIdx(zi){ const zg=LC.layout.zoneGrp; return zg&&zg[zi]!=null ? zg[zi]-1 : zi; }
 // Which xi range belongs to which group (segment between xi i and i+1) —— 由 LC.layout.zones 推導
-function segGrp(xi){ const z=LC.layout.zones; for(let i=0;i<z.length;i++) if(xi<z[i][1]) return i; return z.length-1; }
+function segGrp(xi){ const z=LC.layout.zones; for(let i=0;i<z.length;i++) if(xi<z[i][1]) return zoneGrpIdx(i); return zoneGrpIdx(z.length-1); }
 // Which group does a station belong to (by xi) —— 共享站歸前一組（與 ABF 原行為一致）
-function stGrp(xi){ const z=LC.layout.zones; for(let i=0;i<z.length;i++) if(xi<=z[i][1]) return i; return z.length-1; }
+function stGrp(xi){ const z=LC.layout.zones; for(let i=0;i<z.length;i++) if(xi<=z[i][1]) return zoneGrpIdx(i); return zoneGrpIdx(z.length-1); }
 
 // AGV 圖例：綠=載滿框、橘=載空框、灰=空手
 function drawAgvLegend(tg, lx, ly){
@@ -1695,9 +2050,61 @@ function buildABFSVG(){
   // ── Group zone backgrounds ──（由 LC.layout.zones / GRP_CLR 驅動，組數不限）
   const zoneXi=LC.layout.zones;
   const agvLbls=LC.layout.agvLbls;
-  if(LC.layout.type==='serpentine'){
+  if(LC.layout.type==='plan'){
+    // 平面圖版面：先鋪現場平面圖當底圖
+    if(LC.layout.bg){
+      const im=ns('image');
+      im.setAttribute('href',LC.layout.bg.href);
+      im.setAttributeNS('http://www.w3.org/1999/xlink','href',LC.layout.bg.href); // 舊瀏覽器
+      im.setAttribute('x',0);im.setAttribute('y',0);
+      im.setAttribute('width',LC.layout.bg.w);im.setAttribute('height',LC.layout.bg.h);
+      im.setAttribute('preserveAspectRatio','none');
+      tg.appendChild(im);
+    }
+    // 底圖上的 AGV 走道網（現場綠線）
+    const SC=LC.layout.planScale||1;
+    for(const s of (LC.layout.aisles||[])){
+      const l=ns('line');
+      l.setAttribute('x1',s[0]*SC);l.setAttribute('y1',s[1]*SC);
+      l.setAttribute('x2',s[2]*SC);l.setAttribute('y2',s[3]*SC);
+      l.setAttribute('stroke','#8aa0b8');l.setAttribute('stroke-width','5');
+      l.setAttribute('stroke-linecap','round');l.setAttribute('opacity','0.45');
+      tg.appendChild(l);
+    }
+    // 每一段搬運沿走道畫出來（實線＝送滿框、虛線＝空框回程），顏色＝負責的那一隊
+    LC.groups.forEach((g,gi)=>{
+      const clr=GRP_CLR[gi];
+      const draw=(fi,ti,ret)=>{
+        const pts=planRoute(fi,ti); if(!pts) return;
+        const pl=ns('polyline');
+        pl.setAttribute('points',pts.map(p=>`${p[0]},${p[1]}`).join(' '));
+        pl.setAttribute('fill','none');
+        pl.setAttribute('stroke',ret?clr.ret:clr.fwd);
+        pl.setAttribute('stroke-width',ret?'3':'4');
+        pl.setAttribute('stroke-linejoin','round');pl.setAttribute('opacity','0.85');
+        if(ret) pl.setAttribute('stroke-dasharray','10 7');
+        tg.appendChild(pl);
+        if(!ret){
+          const m=pts[Math.floor(pts.length/2)];
+          const lb=ns('text');lb.setAttribute('x',m[0]);lb.setAttribute('y',m[1]-8);lb.setAttribute('class','slb');
+          lb.setAttribute('style',`fill:${clr.lbl};font-size:15px;font-weight:700`);
+          lb.textContent=clr.name; tg.appendChild(lb);
+        }
+      };
+      for(const t of (g.tasks||[]))                      // 任務清單模式：一條任務一條線
+        if(t.f[0]!==t.t[0]) draw(t.f[0], t.t[0], t.c==='empty');
+      for(const l of g.legs){
+        if(l.mid!=null){
+          if(l.half!=='B') draw(l.src[0], l.mid, false);
+          if(l.half!=='A') draw(l.mid, l.dst[0], false);
+          if(l.half!=='B') draw(l.dst[0], l.src[0], true);   // 空框回程（跳過烤箱）
+        } else { draw(l.src[0], l.dst[0], false); draw(l.dst[0], l.src[0], true); }
+      }
+    });
+  } else if(LC.layout.type==='serpentine'){
     // 蛇形：每組以其站點 bounding box 畫 zone + 標籤（可跨列）
-    for(let gi=0;gi<zoneXi.length;gi++){
+    for(let zi=0;zi<zoneXi.length;zi++){
+      const gi=zoneGrpIdx(zi);
       const mem=abfSt.filter(s=>stGrp(s.xi)===gi);
       if(!mem.length) continue;
       const xs=mem.map(s=>s.x), ys=mem.map(s=>s.y);
@@ -1711,12 +2118,13 @@ function buildABFSVG(){
       const gl=ns('text');gl.setAttribute('x',cx);gl.setAttribute('y',y0+16);gl.setAttribute('class','slb');
       gl.setAttribute('style',`fill:${GRP_CLR[gi].lbl};font-size:15px;font-weight:700;opacity:0.95`);gl.textContent=GRP_CLR[gi].name;tg.appendChild(gl);
       const al=ns('text');al.setAttribute('x',cx);al.setAttribute('y',y0+30);al.setAttribute('class','slb');
-      al.setAttribute('style',`fill:${GRP_CLR[gi].lbl};font-size:10px;opacity:0.8`);al.textContent=agvLbls[gi];tg.appendChild(al);
+      al.setAttribute('style',`fill:${GRP_CLR[gi].lbl};font-size:10px;opacity:0.8`);al.textContent=agvLbls[gi]||"";tg.appendChild(al);
     }
   } else {
     const zoneY=42, zoneH=820;
-    for(let gi=0;gi<zoneXi.length;gi++){
-      const [x0i,x1i]=zoneXi[gi];
+    for(let zi=0;zi<zoneXi.length;zi++){
+      const gi=zoneGrpIdx(zi), [x0i,x1i]=zoneXi[zi];
+      const firstOfGrp = zi===0 || zoneGrpIdx(zi-1)!==gi; // 同組連續帶只標一次
       const zx=SX+x0i*gap-gap*0.45, zw=(x1i-x0i)*gap+gap*0.9;
       const zr=ns('rect');
       zr.setAttribute('x',zx); zr.setAttribute('y',zoneY);
@@ -1726,6 +2134,7 @@ function buildABFSVG(){
       zr.setAttribute('stroke',GRP_CLR[gi].zs.replace('30','50'));
       zr.setAttribute('stroke-width','1.5');
       tg.appendChild(zr);
+      if(!firstOfGrp) continue;
       const glx=SX+(x0i+x1i)/2*gap;
       const gl=ns('text');
       gl.setAttribute('x',glx); gl.setAttribute('y',60);
@@ -1736,12 +2145,12 @@ function buildABFSVG(){
       al.setAttribute('x',glx); al.setAttribute('y',75);
       al.setAttribute('class','slb');
       al.setAttribute('style',`fill:${GRP_CLR[gi].lbl};font-size:11px;opacity:0.8`);
-      al.textContent=agvLbls[gi]; tg.appendChild(al);
+      al.textContent=agvLbls[gi]||''; tg.appendChild(al);
     }
   }
 
-  // ── Tracks ──（站點軌道錨點 a.tfy/a.tyr 連接；ABF 單列→水平、SMK 蛇形→含轉列）
-  const mainSt=abfSt.filter(s=>s.sub===0);
+  // ── Tracks ──（站點軌道錨點 a.tfy/a.tyr 連接；ABF 單列→水平、SMK 蛇形→含轉列；plan 版面上面已畫）
+  const mainSt=LC.layout.type==='plan' ? [] : abfSt.filter(s=>s.sub===0 && !s.alias);
   for(let i=0;i<mainSt.length-1;i++){
     const a=mainSt[i], b=mainSt[i+1];
     const gi=segGrp(a.xi);
@@ -1772,7 +2181,7 @@ function buildABFSVG(){
   }
   // Vertical connector lines for sub>0 stations
   for(const s of abfSt){
-    if(s.sub===0) continue;
+    if(s.sub===0 || s.alias || LC.layout.type==='plan') continue;
     const gi=stGrp(s.xi);
     const vc=ns('line');
     vc.setAttribute('x1',s.x);vc.setAttribute('y1',ABF_TY_FWD+2);
@@ -1817,6 +2226,7 @@ function buildABFSVG(){
   // ── Stations ────────────────────────────────────────────────
   for(let i=0;i<abfSt.length;i++){
     const s=abfSt[i];
+    if(s.alias) continue; // 同一台設備的第二個製程步驟：只畫一個機台，編號寫在本尊標籤上
     const g=ns('g'); g.setAttribute('id',`abf-stn-${i}`);
     const gi=stGrp(s.xi);
     const gc=GRP_CLR[gi];
@@ -1902,6 +2312,7 @@ function buildABFSVG(){
 
       const ry2=s.y+36;
       makeSlot(g, s.x-52, ry2, `abf-slot-${i}-out_recv`, '收空框', 30, 26);
+      makeSeedToggle(g, i, s, s.x-52, ry2);   // 這一格可以點，切換「一開始有沒有空框」
       makeArrow(g, s.x-36, ry2, s.x-17, gc.fwd);
       makeSlot(g, s.x,     ry2, `abf-slot-${i}-out_proc`, '放置位', 30, 26);
       makeArrow(g, s.x+17, ry2, s.x+36, gc.fwd);
@@ -2034,23 +2445,53 @@ function toggleAgvBoard(){
   if(agvBoardOpen){ renderAgvBoard(); trapFocus(el&&el.querySelector('.abx')); }
   else releaseFocus();
 }
+// 這一隊負責什麼（藍圖有寫 agvLabel 就用它，否則由段別組出來）
+function groupJobText(grp){
+  const bp=BLUEPRINTS[LC.id]||{}, g=(bp.groups||[])[grp-1];
+  if(!g) return '—';
+  if(g.agvLabel) return g.agvLabel.replace(/^AGV\s*G\d+（?/,'').replace(/）$/,'');
+  const nm={}; (bp.spine||[]).forEach(c=>{nm[c.role]=c.name;});
+  const legs=(g.legs||[g]).map(l=>`${nm[l.src]||l.src}→${nm[l.dst]||l.dst}`);
+  const self=(g.selfRet||[]).map(r=>`${nm[r]||r} 站內回空框`);
+  return [...legs,...self].join('、')||'—';
+}
+// 這台車現在在幹嘛
+function agvNowText(a){
+  const nm=i=>(abfSt[i]?.name||'?').replace(/_\d+$/,'');
+  if(a.stag>0) return '⏸ 尚未上線';
+  switch(a.phase){
+    case 'toPickup':   return `🚚 前往取料 → ${nm(a.toPos)}`;
+    case 'picking':    return `⬆ 取料中 ${nm(a.pos)}（${Math.ceil(a.pickWait)}s）`;
+    case 'delivering': return `${a.cargo==='empty'?'○ 載空框':'● 載滿框'} → ${nm(a.destPos)}`;
+    case 'dropping':   return `⬇ 放料中 ${nm(a.pos)}（${Math.ceil(a.dropWait)}s）`;
+    default:           return `… 待命 @${nm(a.pos)}`;
+  }
+}
 function renderAgvBoard(){
   const body=document.getElementById('agv-board-body'); if(!body) return;
   let sumM=0,sumH=0,sumI=0;
+  const job={};   // 同一隊只在第一台顯示任務說明，其餘留白
   const rows=abfAGVs.map(a=>{
     const mv=a.tMove||0, hd=a.tHandle||0, id=a.tIdle||0;
     const act=mv+hd, denom=act+id;
     const util=denom>0?act/denom:0;
     sumM+=mv; sumH+=hd; sumI+=id;
     const pct=Math.round(util*100);
-    return `<tr><td>${a.id}</td><td>${fmt(mv)}</td><td>${fmt(hd)}</td><td>${fmt(id)}</td>`
+    const gc=GRP_CLR[a.grp-1]||GRP_CLR[0];
+    const first=!job[a.grp]; job[a.grp]=1;
+    const n=abfAGVs.filter(o=>o.grp===a.grp).length;
+    const jobCell=first
+      ? `<td rowspan="${n}" style="border-left:3px solid ${gc.lbl};font-size:11px;line-height:1.35;text-align:left">`
+        +`<b style="color:${gc.lbl}">G${a.grp}</b>（${n}台）<br>${groupJobText(a.grp)}</td>` : '';
+    return `<tr>${jobCell}<td>${a.id}</td><td style="font-size:11px;text-align:left;white-space:nowrap">${agvNowText(a)}</td>`
+      +`<td>${fmt(mv)}</td><td>${fmt(hd)}</td><td>${fmt(id)}</td>`
       +`<td>${pct}%<span class="ub"><i style="width:${pct}%"></i></span></td></tr>`;
   }).join('');
   const tAct=sumM+sumH, tDen=tAct+sumI;
   const avgUtil=tDen>0?Math.round(tAct/tDen*100):0;
-  const totRow=`<tr class="tot"><td>總計</td><td>${fmt(sumM)}</td><td>${fmt(sumH)}</td><td>${fmt(sumI)}</td>`
+  const totRow=`<tr class="tot"><td colspan="2">總計 ${abfAGVs.length} 台</td><td></td><td>${fmt(sumM)}</td><td>${fmt(sumH)}</td><td>${fmt(sumI)}</td>`
       +`<td>${avgUtil}%<span class="ub"><i style="width:${avgUtil}%"></i></span></td></tr>`;
-  body.innerHTML=`<table><thead><tr><th>車</th><th>移動</th><th>取放</th><th>閒置</th><th>稼動率</th></tr></thead>`
+  body.innerHTML=`<table><thead><tr><th>隊別／負責任務</th><th>車</th><th>目前動作</th><th>移動</th><th>取放</th><th>閒置</th><th>稼動率</th></tr></thead>`
       +`<tbody>${rows}${totRow}</tbody></table>`;
 }
 
@@ -2186,12 +2627,13 @@ function updateUI(){
     } else if(s.buf){
       const wt=document.getElementById(`abf-buf-${i}`);
       const bar=document.getElementById(`abf-bar-${i}`);
-      const pending = s.pendingFrames ? s.pendingFrames.length : 0;
-      const total = s.fullAvail + pending;
+      const mates = shareMates(s); // 共用烤箱：兩個步驟的框合計顯示
+      const pending = mates.reduce((n,o)=>n+(o.pendingFrames?o.pendingFrames.length:0),0);
+      const total = mates.reduce((n,o)=>n+o.fullAvail,0) + pending;
       if(wt){
         if(pending > 0){
-          const minLeft = Math.ceil(Math.min(...s.pendingFrames));
-          wt.textContent = `${s.fullAvail}/${s.buf}  (+${pending} ⌛${minLeft}s)`;
+          const minLeft = Math.ceil(Math.min(...mates.flatMap(o=>o.pendingFrames||[])));
+          wt.textContent = `${total-pending}/${s.buf}  (+${pending} ⌛${minLeft}s)`;
           wt.setAttribute('style','fill:#cc6600;font-size:11px;font-weight:bold');
         } else {
           wt.textContent = `${total}/${s.buf}`;
@@ -2255,13 +2697,29 @@ function updateABFAgvPos(a){
 
   let x, ty;
   if(a.phase==='idle'||a.phase==='picking'||a.phase==='dropping'||a.toPos<0){
-    x  = abfSt[a.pos]?.x||0;
-    ty = abfSt[a.pos]?.y||ABF_TY_FWD;
+    const s=abfSt[a.pos];
+    x  = s?.x||0;
+    ty = s?.y||ABF_TY_FWD;
+    if(LC.layout.type==='plan' && s){
+      // 停靠時排在機台方塊「下緣外側」，同站多台再左右攤開，才不會蓋住格位資訊
+      const parked=abfAGVs.filter(o=>o.pos===a.pos &&
+        (o.phase==='idle'||o.phase==='picking'||o.phase==='dropping'||o.toPos<0));
+      const k=Math.max(0,parked.indexOf(a)), n=parked.length||1;
+      x += (k-(n-1)/2)*42;
+      ty += stnHalfH(s)+22;
+    }
+  } else if(LC.layout.type==='plan'){
+    // 平面圖版面：沿實際走道折線前進
+    const pts=planRoute(a.fromPos,a.toPos);
+    const p=pts?alongRoute(pts,a.legPos):[abfSt[a.pos]?.x||0, abfSt[a.pos]?.y||0];
+    x=p[0]; ty=p[1];
   } else {
     const from=abfSt[a.fromPos], to=abfSt[a.toPos];
     const sx=from?.x||0, dx=to?.x||0;
     // 前進軌道：蛇形用站序(下游)、單列用 x 方向（與 ABF 原行為一致）
-    const fwd = LC.layout.type==='serpentine' ? (a.toPos>a.fromPos) : (dx>=sx);
+    // 走去程線還是回程線：平面版面看載的是滿框還空框，其餘沿用原本的方向判斷
+    const fwd = LC.layout.type==='plan' ? (a.cargo!=='empty')
+              : LC.layout.type==='serpentine' ? (a.toPos>a.fromPos) : (dx>=sx);
     const sy = fwd ? (from?.tfy ?? ABF_TY_FWD) : (from?.tyr ?? ABF_TY_RET);
     const dy = fwd ? (to?.tfy ?? ABF_TY_FWD) : (to?.tyr ?? ABF_TY_RET);
     x  = sx+(dx-sx)*a.legPos;
@@ -2286,7 +2744,8 @@ function updateABFAgvPos(a){
     if(a.phase==='picking')   {lbl.textContent=`取 ${Math.ceil(a.pickWait)}s`;  lbl.setAttribute('style','font-size:9px;font-weight:bold;fill:#00922f');}
     else if(a.phase==='dropping'){lbl.textContent=`放 ${Math.ceil(a.dropWait)}s`; lbl.setAttribute('style','font-size:9px;font-weight:bold;fill:#1565c0');}
     else if(a.stag>0)         {lbl.textContent='等待';lbl.setAttribute('style','font-size:9px;font-weight:bold;fill:#c79100');}
-    else                      {lbl.textContent='';}
+    else                      {const gc=GRP_CLR[a.grp-1]||GRP_CLR[0];
+                               lbl.textContent=`G${a.grp}`;lbl.setAttribute('style',`font-size:9px;font-weight:bold;fill:${gc.lbl};opacity:0.85`);}
   }
 }
 
@@ -2470,6 +2929,10 @@ function buildParamMeta(){
     out.push({key:bp.dropKey,   label:'放料-機台',  unit:'秒',min:0,step:5,type:'int',apply:'resim',line:L,section:'pickdrop'});
     out.push({key:bp.bufPickKey,label:'取料-烤箱',unit:'秒',min:0,step:5,type:'int',apply:'resim',line:L,section:'pickdrop'});
     out.push({key:bp.bufDropKey,label:'放料-烤箱',unit:'秒',min:0,step:5,type:'int',apply:'resim',line:L,section:'pickdrop'});
+    // 站內空框回程（入料端→出料端）
+    for(const c of bp.spine){ if(!c.selfRetKey) continue;
+      out.push({key:c.selfRetKey,label:`${c.name} 站內回空框`,unit:'秒',min:0,step:5,type:'int',apply:'resim',line:L,section:'route'});
+    }
     // 路段行走時間（由 blueprint routeParams 宣告 label/seg）
     for(const rp of (bp.routeParams||[]))
       out.push({key:rp.key,label:rp.label,unit:'秒',min:1,step:10,type:'int',apply:'resim',line:L,section:'route',seg:rp.seg});
@@ -2479,7 +2942,13 @@ function buildParamMeta(){
     }
     // 設備數量：每組 AGV
     for(const g of bp.groups)
-      out.push({key:g.agvKey,label:g.agvLabel||`AGV G${g.grp}(${roleName[g.src]}→${roleName[g.dst]})`,unit:'台',min:1,max:9,step:1,type:'int',apply:'resim',line:L,section:'equip'});
+      out.push({key:g.agvKey,
+        label:g.agvLabel||`AGV G${g.grp}(${(g.tasks||g.legs||[g]).map(t=>t.f!=null?`${roleName[t.f]}→${roleName[t.t]}`:`${roleName[t.src]}→${roleName[t.dst]}`).join('、')})`,
+        unit:'台',min:1,max:9,step:1,type:'int',apply:'resim',line:L,section:'equip'});
+    // 起始收空框（0/1）：畫面上也可以直接點那一格切換
+    for(const c of bp.spine){ if(!c.seedKey) continue;
+      out.push({key:c.seedKey,label:`${c.name} 起始收空框`,unit:'框',min:0,max:1,step:1,type:'int',apply:'resim',line:L,section:'equip'});
+    }
     // 設備數量：緩衝站容量
     for(const c of bp.spine){ if(!c.bufKey)continue;
       out.push({key:c.bufKey,label:`${c.name} 容量`,unit:'框',min:1,max:99,step:1,type:'int',apply:'resim',line:L,section:'equip'});
@@ -2795,7 +3264,7 @@ async function exportResultPNG(){
   // 標題列
   x.fillStyle=C.acc; x.fillRect(0,0,W,56);
   try{ const img=await loadImg(LOGO_SRC); const ih=38,iw=img.width*ih/img.height; x.drawImage(img,16,9,iw,ih);
-       x.fillStyle='#fff'; x.font='700 18px "Segoe UI",system-ui,sans-serif'; x.fillText(`欣興電子　${R.line} 模擬報告`,16+iw+14,26);
+       x.fillStyle='#fff'; x.font='700 18px "Segoe UI",system-ui,sans-serif'; x.fillText(`流程計算系統　${R.line} 報告`,16+iw+14,26);
        x.font='400 12px "Segoe UI",system-ui,sans-serif'; x.fillText(ts.disp,16+iw+14,44);
   }catch(_){ x.fillStyle='#fff'; x.font='700 18px "Segoe UI",system-ui,sans-serif'; x.fillText(`${R.line} 模擬報告`,16,26);
        x.font='400 12px "Segoe UI",system-ui,sans-serif'; x.fillText(ts.disp,16,44); }
@@ -2936,17 +3405,21 @@ function shortName(n){
 function buildRouteMap(){
   const svg=document.getElementById('route-map'); if(!svg) return;
   const bp=BLUEPRINTS[selectedLine]; if(!bp) return;
-  const cols=bp.spine, n=cols.length, rps=bp.routeParams||[];
-  const W=280, px=i=> 16 + i*((W-32)/Math.max(1,n-1)), yb=28;
+  // routeParams 的 pair 是「現場欄位(xi)」，所以這張圖也要按欄位排點（一欄可能有好幾站）
+  const byXi=new Map();
+  for(const c of bp.spine) if(!byXi.has(c.xi)) byXi.set(c.xi,c);
+  const xis=[...byXi.keys()].sort((a,b)=>a-b), n=xis.length, rps=bp.routeParams||[];
+  const slot=new Map(xis.map((x,i)=>[x,i]));            // xi → 第幾個點
+  const W=280, px=x=> 16 + (slot.get(x)??0)*((W-32)/Math.max(1,n-1)), yb=28;
   const seg2key={}; rps.forEach(rp=>{seg2key[rp.seg]=rp.key;});
   let h='';
   rps.forEach(rp=>{
-    const [a,b]=rp.pair, x1=px(a), x2=px(b);
-    if(b===a+1){ h+=`<line class="rseg" data-seg="${rp.seg}" x1="${x1}" y1="${yb}" x2="${x2}" y2="${yb}"/>`; }
-    else { const mx=(x1+x2)/2, yy=yb+16+(b-a)*4; h+=`<path class="rseg" data-seg="${rp.seg}" d="M${x1} ${yb+3} Q ${mx} ${yy} ${x2} ${yb+3}" fill="none"/>`; }
+    const [a,b]=rp.pair, x1=px(a), x2=px(b), span=Math.abs((slot.get(b)??0)-(slot.get(a)??0));
+    if(span===1){ h+=`<line class="rseg" data-seg="${rp.seg}" x1="${x1}" y1="${yb}" x2="${x2}" y2="${yb}"/>`; }
+    else { const mx=(x1+x2)/2, yy=yb+16+span*4; h+=`<path class="rseg" data-seg="${rp.seg}" d="M${x1} ${yb+3} Q ${mx} ${yy} ${x2} ${yb+3}" fill="none"/>`; }
   });
-  cols.forEach((c,i)=>{ const s=c.short||shortName(c.name);
-    h+=`<circle cx="${px(i)}" cy="${yb}" r="2.5" fill="#8090b0"/><text x="${px(i)}" y="${yb-7}" style="font-size:${n>8?7:9}px">${s}</text>`; });
+  xis.forEach(x=>{ const c=byXi.get(x), s=c.short||shortName(c.name);
+    h+=`<circle cx="${px(x)}" cy="${yb}" r="2.5" fill="#8090b0"/><text x="${px(x)}" y="${yb-7}" style="font-size:${n>8?7:9}px">${s}</text>`; });
   svg.innerHTML=h;
   const hot=(segk,on)=>{const s=svg.querySelector(`.rseg[data-seg="${segk}"]`);if(s)s.classList.toggle('hot',on);const pg=document.getElementById('pg-'+seg2key[segk]);if(pg)pg.classList.toggle('hot',on);};
   svg.querySelectorAll('.rseg').forEach(seg=>{
@@ -3059,7 +3532,8 @@ function renderLineSelect(){
     wrap.appendChild(b);
     if(bp.custom){
       const t=document.createElement('div'); t.className='line-card-tools';
-      t.innerHTML=`<button title="編輯" aria-label="編輯製程線" onclick="event.stopPropagation();openWizard('${id}')">✎</button>`
+      // 只有平面版面編輯器建的線能改（匯入的舊格式線只能匯出/刪除）
+      t.innerHTML=(bp.planSrc?`<button title="編輯" aria-label="編輯製程線" onclick="event.stopPropagation();openPlanEd('${id}')">✎</button>`:'')
         +`<button title="匯出" aria-label="匯出製程線" onclick="event.stopPropagation();exportBlueprint('${id}')">⬇</button>`
         +`<button class="rst" title="刪除" aria-label="刪除製程線" onclick="event.stopPropagation();wzDelete('${id}')">🗑</button>`;
       wrap.appendChild(t);
@@ -3067,11 +3541,11 @@ function renderLineSelect(){
     box.appendChild(wrap);
   }
   // 新增 / 匯入 卡
-  const add=document.createElement('button');
-  add.onclick=()=>openWizard();
-  add.style.cssText='width:220px;height:110px;font-size:16px;font-weight:700;background:var(--card);border:2px dashed var(--accent);color:var(--accent);border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px';
-  add.innerHTML='＋ 新增製程線<span style="font-size:11px;color:#5a6a85;font-weight:400">用精靈建立</span>';
-  box.appendChild(add);
+  const pe=document.createElement('button');
+  pe.onclick=()=>openPlanEd();
+  pe.style.cssText='width:220px;height:110px;font-size:16px;font-weight:700;background:var(--card);border:2px dashed var(--green);color:var(--green);border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px';
+  pe.innerHTML='🗺 平面版面新增<span style="font-size:11px;color:#5a6a85;font-weight:400">上底圖、點圖擺機台、自訂任務</span>';
+  box.appendChild(pe);
   const imp=document.createElement('button');
   imp.onclick=()=>document.getElementById('import-line').click();
   imp.style.cssText='width:150px;height:110px;font-size:14px;font-weight:600;background:var(--card);border:1px dashed var(--border);color:var(--dim);border-radius:8px;cursor:pointer';
@@ -3103,138 +3577,239 @@ function importLineFile(e){
 }
 
 // ══════════════════════════════════════════════════════════════
-// LINE BUILDER WIZARD（Phase 3）
+// 平面版面編輯器：底圖 ＋ 點圖擺機台 ＋ 自訂搬運任務
+// 產出的是「任務清單」型 blueprint（groups[].tasks），流程不必是一條直線
 // ══════════════════════════════════════════════════════════════
-const WIZ_TYPES=[['refill','補料(起點)'],['transfer','加工機台'],['buffer','烤箱'],['changer','換框(計產)']];
-let wizState=null;
-function wizFromBlueprint(bp){
-  // 將既有自訂 blueprint 反推回精靈狀態（依 xi 順序）
-  const sts=bp.spine.slice().sort((a,b)=>a.xi-b.xi).map(c=>({
-    name:c.name, type:c.type,
-    val: c.type==='buffer' ? (bp.defaults[c.bufKey]||6) : (bp.defaults[c.procKey]||360)
-  }));
-  const agv={}; (bp.groups||[]).forEach((g,k)=>{ agv['g'+k]=bp.defaults[g.agvKey]||2; });
-  const seg = bp.routeParams&&bp.routeParams.length ? (bp.defaults[bp.routeParams[0].key]||200) : 200;
-  return {editId:bp.id, name:bp.name, batch:bp.defaults[bp.batchKey]||1, color:(bp.color||'#0a6ebd').replace('var(--abf)','#1565c0').replace('var(--smk)','#d9600a'),
-    seg, pick:bp.defaults[bp.pickKey]||0, drop:bp.defaults[bp.dropKey]||0, stations:sts, agv};
-}
-function openWizard(editId){
-  wizState = (editId && BLUEPRINTS[editId] && BLUEPRINTS[editId].custom)
-    ? wizFromBlueprint(BLUEPRINTS[editId])
-    : {editId:null, name:'', batch:1, color:'#0a6ebd', seg:200, pick:0, drop:0, agv:{},
-       stations:[{name:'CLN',type:'refill',val:360},{name:'機台1',type:'transfer',val:360},{name:'換框機',type:'changer',val:360}]};
-  document.getElementById('wz-title').textContent = editId?'編輯製程線':'新增製程線';
-  document.getElementById('wz-name').value=wizState.name;
-  document.getElementById('wz-batch').value=wizState.batch;
-  document.getElementById('wz-color').value=wizState.color;
-  document.getElementById('wz-seg').value=wizState.seg;
-  document.getElementById('wz-pick').value=wizState.pick;
-  document.getElementById('wz-drop').value=wizState.drop;
-  renderWizStations(); renderWizGroups(); setWzMsg('');
-  const wzo=document.getElementById('line-wizard'); wzo.classList.add('show');
-  trapFocus(wzo.querySelector('.wz'));
-}
-function closeWizard(){ document.getElementById('line-wizard').classList.remove('show'); releaseFocus(); }
-function setWzMsg(m,cls){ const el=document.getElementById('wz-msg'); if(el){ el.textContent=m||''; el.className=cls||''; } }
-function wzReadBasics(){
-  wizState.name=document.getElementById('wz-name').value.trim();
-  wizState.batch=+document.getElementById('wz-batch').value||1;
-  wizState.color=document.getElementById('wz-color').value;
-  wizState.seg=+document.getElementById('wz-seg').value||200;
-  wizState.pick=+document.getElementById('wz-pick').value||0;
-  wizState.drop=+document.getElementById('wz-drop').value||0;
-}
-function renderWizStations(){
-  const tb=document.getElementById('wz-stns'); tb.innerHTML='';
-  wizState.stations.forEach((s,i)=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${i}</td>`
-      +`<td><input value="${s.name}" onchange="wizState.stations[${i}].name=this.value;renderWizGroups()" style="width:120px"></td>`
-      +`<td><select onchange="wizState.stations[${i}].type=this.value;renderWizGroups()">${WIZ_TYPES.map(t=>`<option value="${t[0]}"${s.type===t[0]?' selected':''}>${t[1]}</option>`).join('')}</select></td>`
-      +`<td><input type="number" min="1" value="${s.val}" onchange="wizState.stations[${i}].val=+this.value" style="width:72px"></td>`
-      +`<td><button class="mini" onclick="wzMove(${i},-1)">↑</button> <button class="mini" onclick="wzMove(${i},1)">↓</button></td>`
-      +`<td><button class="mini rst" onclick="wzDel(${i})">✕</button></td>`;
-    tb.appendChild(tr);
-  });
-}
-function wzAddStation(){ wzReadBasics(); wizState.stations.push({name:'站別'+wizState.stations.length,type:'transfer',val:360}); renderWizStations(); renderWizGroups(); }
-function wzDel(i){ wzReadBasics(); wizState.stations.splice(i,1); renderWizStations(); renderWizGroups(); }
-function wzMove(i,d){ wzReadBasics(); const j=i+d,a=wizState.stations; if(j<0||j>=a.length)return; [a[i],a[j]]=[a[j],a[i]]; renderWizStations(); renderWizGroups(); }
-function wzGroups(){
-  const sts=wizState.stations, stops=sts.map((s,i)=>i).filter(i=>sts[i].type!=='buffer'), gs=[];
-  for(let g=0;g<stops.length-1;g++){
-    const a=stops[g], b=stops[g+1]; let mid=null;
-    for(let k=a+1;k<b;k++) if(sts[k].type==='buffer'){ mid=k; break; }
-    gs.push({srcIdx:a,midIdx:mid,dstIdx:b});
+// src/sink 是「不用管空框」的兩端：投料口只吐滿框、出料口收到滿框就算完成
+const PE_TYPES=[['src','投料口(人員投滿框)'],['transfer','加工機台'],['buffer','烤箱/暫存'],
+                ['sink','出料口(放滿框即完成)'],['refill','補料機(要回空框)'],['changer','換框機(要回空框)']];
+const PE_EMPTY=[['','空框由上游收'],['self','站內回自己'],['drop','人員收走']];
+const peNoEmpty=t=>t==='src'||t==='sink'||t==='buffer';   // 這些型別不用選空框處理
+const peSeedOf=s=>s.seed==null ? true : !!s.seed;   // 起始收空框預設「有」
+const PE_PAL=['#0277bd','#00853a','#7b2fbf','#c46a00','#0a8080','#b03a66','#c62828','#455a64'];
+let peState=null;
+function openPlanEd(editId){
+  const bp=editId&&BLUEPRINTS[editId];
+  peState = (bp&&bp.custom&&bp.planSrc) ? JSON.parse(JSON.stringify(bp.planSrc))
+    : {editId:null, name:'', batch:1, color:'#2e8b57', pick:30, drop:30, secPerUnit:0.1,
+       bg:null, bgW:0, bgH:0, stns:[], tasks:[], teams:[{name:'G1',n:2}]};
+  if(bp&&bp.custom&&bp.planSrc){
+    peState.editId=editId;
+    peState.bg=(bp.layout&&bp.layout.bg)?bp.layout.bg.href:null;   // 底圖只存一份，從 layout 借回來
   }
-  return gs;
+  const $=id=>document.getElementById(id);
+  $('pe-title').textContent = peState.editId?'編輯平面版面線':'平面版面編輯器';
+  $('pe-name').value=peState.name; $('pe-batch').value=peState.batch;
+  $('pe-color').value=peState.color; $('pe-pick').value=peState.pick;
+  $('pe-drop').value=peState.drop;  $('pe-spu').value=peState.secPerUnit;
+  peRender(); setPeMsg('');
+  const el=$('plan-editor'); el.classList.add('show'); trapFocus(el.querySelector('.wz'));
 }
-function renderWizGroups(){
-  const box=document.getElementById('wz-groups'), gs=wzGroups(), nm=i=>wizState.stations[i]?.name||'?';
-  if(!gs.length){ box.innerHTML='<span class="sl" style="color:var(--dim);font-size:11px">需至少兩個機台站（補料/加工/換框）</span>'; return; }
-  box.innerHTML=gs.map((g,k)=>{
-    const v=wizState.agv['g'+k]||2;
-    return `<div class="sr"><span style="font-size:12px">G${k+1}：${nm(g.srcIdx)}${g.midIdx!=null?'→'+nm(g.midIdx):''}→${nm(g.dstIdx)}</span>`
-      +`<span><input type="number" min="1" max="9" value="${v}" onchange="wizState.agv['g${k}']=+this.value" style="width:48px"> 台</span></div>`;
-  }).join('');
+function closePlanEd(){
+  // 先關再收焦點：releaseFocus 萬一出錯也不能讓對話框關不掉
+  document.getElementById('plan-editor').classList.remove('show');
+  try{ releaseFocus(); }catch(_){}
 }
-function wzCompile(){
-  wzReadBasics();
-  const id=wizState.editId||('line'+Date.now().toString(36));
-  const sts=wizState.stations, n=sts.length, role=i=>'s'+i;
-  const spine=sts.map((s,i)=>{
-    const c={role:role(i),type:s.type,name:s.name,xi:i};
-    if(s.type==='buffer'){ c.bufKey=`${id}_b${i}`; c.holdTime=0; }
-    else { c.procKey=`${id}_p${i}`; if(s.type!=='refill') c.countKey=`${id}_n${i}`; }
+// 關閉鈕用 addEventListener 綁，不靠 inline onclick
+document.addEventListener('DOMContentLoaded',()=>{
+  ['pe-close','pe-cancel'].forEach(id=>{
+    const b=document.getElementById(id);
+    if(b) b.addEventListener('click',ev=>{ ev.preventDefault(); ev.stopPropagation(); closePlanEd(); });
+  });
+});
+function setPeMsg(m,cls){ const el=document.getElementById('pe-msg'); if(el){ el.textContent=m||''; el.className=cls||''; } }
+function peSync(){
+  const $=id=>document.getElementById(id);
+  peState.name=$('pe-name').value.trim(); peState.batch=+$('pe-batch').value||1;
+  peState.color=$('pe-color').value; peState.pick=+$('pe-pick').value||0;
+  peState.drop=+$('pe-drop').value||0; peState.secPerUnit=+$('pe-spu').value||0.1;
+}
+function peLoadBg(e){
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    const im=new Image();
+    im.onload=()=>{ peSync(); peState.bg=ev.target.result; peState.bgW=im.width; peState.bgH=im.height; peRender();
+      setPeMsg(`底圖 ${im.width}×${im.height}px 已載入，點圖面新增機台`,'ok'); };
+    im.onerror=()=>setPeMsg('圖檔讀不出來','err');
+    im.src=ev.target.result;
+  };
+  r.readAsDataURL(f); e.target.value='';
+}
+// ── 畫布：底圖 + 機台節點 + 任務連線 ──
+function peRender(){
+  const cv=document.getElementById('pe-canvas'); if(!cv) return;
+  const W=peState.bgW||1200, H=peState.bgH||700;
+  const scale=Math.min(1, 980/W);                       // 縮到對話框裝得下
+  cv.style.width=W+'px'; cv.style.height=H+'px'; cv.style.transform=`scale(${scale})`;
+  cv.parentElement.style.height=Math.round(H*scale)+8+'px';
+  let h = peState.bg ? `<img src="${peState.bg}" width="${W}" height="${H}" alt="底圖">`
+                     : `<div style="width:${W}px;height:${H}px;background:repeating-linear-gradient(45deg,#0000,#0000 12px,#8881 12px,#8881 24px)"></div>`;
+  h+=`<svg width="${W}" height="${H}" style="position:absolute;inset:0;pointer-events:none">`;
+  peState.tasks.forEach(t=>{
+    const a=peState.stns[t.f], b=peState.stns[t.t];
+    if(!a||!b||t.f===t.t) return;
+    const col=PE_PAL[(t.g||0)%PE_PAL.length];
+    h+=`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${col}" stroke-width="3"`
+      +`${t.c==='empty'?' stroke-dasharray="9 6" opacity="0.75"':' opacity="0.9"'}/>`;
+  });
+  h+='</svg>';
+  peState.stns.forEach((s,i)=>{
+    const col=s.type==='buffer'?'#b8860b':(s.type==='refill'||s.type==='src')?'#00853a'
+             :(s.type==='changer'||s.type==='sink')?'#c62828':'#0277bd';
+    h+=`<div class="pe-node" data-i="${i}" style="left:${s.x}px;top:${s.y}px;background:${col}">${i+1}. ${s.name}</div>`;
+  });
+  cv.innerHTML=h;
+  cv.onclick=ev=>{ if(ev.target!==cv && ev.target.tagName!=='IMG' && ev.target.tagName!=='DIV') return;
+    if(ev.target.classList.contains('pe-node')) return;
+    const r=cv.getBoundingClientRect();
+    peSync();
+    peState.stns.push({name:'站'+(peState.stns.length+1), type:peState.stns.length?'transfer':'refill',
+      val:360, n:1, empty:'', x:Math.round((ev.clientX-r.left)/scale), y:Math.round((ev.clientY-r.top)/scale)});
+    peRender();
+  };
+  cv.querySelectorAll('.pe-node').forEach(el=>{
+    el.onmousedown=ev=>{
+      ev.preventDefault(); ev.stopPropagation();
+      const i=+el.dataset.i, r=cv.getBoundingClientRect();
+      const move=e=>{ peState.stns[i].x=Math.round((e.clientX-r.left)/scale);
+                      peState.stns[i].y=Math.round((e.clientY-r.top)/scale);
+                      el.style.left=peState.stns[i].x+'px'; el.style.top=peState.stns[i].y+'px'; };
+      const up=()=>{ document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up); peRender(); };
+      document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);
+    };
+  });
+  peRenderStns(); peRenderTasks(); peRenderTeams();
+}
+function peStnOpts(sel){ return peState.stns.map((s,i)=>`<option value="${i}"${i===sel?' selected':''}>${i+1}. ${s.name}</option>`).join(''); }
+function peRenderStns(){
+  document.getElementById('pe-stns').innerHTML = peState.stns.map((s,i)=>
+     `<tr><td>${i+1}</td>`
+    +`<td><input value="${s.name}" onchange="peState.stns[${i}].name=this.value;peRender()" style="width:110px"></td>`
+    +`<td><select onchange="peState.stns[${i}].type=this.value;peRender()">${PE_TYPES.map(t=>`<option value="${t[0]}"${s.type===t[0]?' selected':''}>${t[1]}</option>`).join('')}</select></td>`
+    +`<td><input type="number" min="1" value="${s.val}" onchange="peState.stns[${i}].val=+this.value" style="width:66px"></td>`
+    +`<td>${s.type==='buffer'||s.type==='refill'||s.type==='src'?'—':`<input type="number" min="1" max="9" value="${s.n||1}" onchange="peState.stns[${i}].n=+this.value" style="width:44px">`}</td>`
+    +`<td>${peNoEmpty(s.type)?'<span style="color:var(--dim);font-size:11px">不用回空框</span>':`<select onchange="peState.stns[${i}].empty=this.value">${PE_EMPTY.map(e=>`<option value="${e[0]}"${(s.empty||'')===e[0]?' selected':''}>${e[1]}</option>`).join('')}</select>`}</td>`
+    +`<td>${s.type!=='transfer'?'<span style="color:var(--dim);font-size:11px">—</span>':`<select onchange="peState.stns[${i}].seed=+this.value">`
+        +`<option value="1"${peSeedOf(s)?' selected':''}>有</option><option value="0"${peSeedOf(s)?'':' selected'}>無</option></select>`}</td>`
+    +`<td><button class="mini rst" onclick="peDelStn(${i})">✕</button></td></tr>`).join('')
+    || '<tr><td colspan="8" style="color:var(--dim);font-size:11px">在上面的圖點一下就會新增機台</td></tr>';
+}
+function peDelStn(i){
+  peState.stns.splice(i,1);
+  peState.tasks=peState.tasks.filter(t=>t.f!==i&&t.t!==i)
+    .map(t=>({...t, f:t.f>i?t.f-1:t.f, t:t.t>i?t.t-1:t.t}));
+  peRender();
+}
+function peAddTask(){ peSync(); peState.tasks.push({f:0,t:Math.min(1,peState.stns.length-1),c:'full',g:0}); peRender(); }
+function peRenderTasks(){
+  document.getElementById('pe-tasks').innerHTML = peState.tasks.map((t,i)=>
+     `<tr><td><select onchange="peState.tasks[${i}].f=+this.value;peRender()">${peStnOpts(t.f)}</select></td>`
+    +`<td style="color:var(--dim)">→</td>`
+    +`<td><select onchange="peState.tasks[${i}].t=+this.value;peRender()">${peStnOpts(t.t)}</select></td>`
+    +`<td><select onchange="peState.tasks[${i}].c=this.value;peRender()">`
+      +`<option value="full"${t.c==='full'?' selected':''}>滿框</option>`
+      +`<option value="empty"${t.c==='empty'?' selected':''}>空框</option></select></td>`
+    +`<td><select onchange="peState.tasks[${i}].g=+this.value;peRender()">`
+      +peState.teams.map((q,k)=>`<option value="${k}"${k===(t.g||0)?' selected':''}>${q.name}</option>`).join('')+`</select></td>`
+    +`<td><button class="mini rst" onclick="peState.tasks.splice(${i},1);peRender()">✕</button></td></tr>`).join('')
+    || '<tr><td colspan="6" style="color:var(--dim);font-size:11px">還沒有任務。來源和目的選同一站＝站內空框回程</td></tr>';
+}
+function peAddTeam(){ peSync(); peState.teams.push({name:'G'+(peState.teams.length+1), n:2}); peRender(); }
+function peRenderTeams(){
+  document.getElementById('pe-teams').innerHTML = peState.teams.map((q,i)=>
+     `<div class="sr"><span style="width:12px;height:12px;border-radius:3px;background:${PE_PAL[i%PE_PAL.length]};display:inline-block"></span>`
+    +`<input value="${q.name}" onchange="peState.teams[${i}].name=this.value;peRender()" style="width:70px">`
+    +`<span><input type="number" min="1" max="9" value="${q.n}" onchange="peState.teams[${i}].n=+this.value" style="width:44px"> 台</span>`
+    +`<span style="flex:1;font-size:11px;color:var(--dim)">${peState.tasks.filter(t=>(t.g||0)===i).length} 個任務</span>`
+    +`<button class="mini rst" onclick="peDelTeam(${i})">✕</button></div>`).join('');
+}
+function peDelTeam(i){
+  if(peState.teams.length<=1){ setPeMsg('至少要留一隊','err'); return; }
+  peState.teams.splice(i,1);
+  peState.tasks=peState.tasks.map(t=>({...t, g:(t.g||0)===i?0:((t.g||0)>i?(t.g||0)-1:(t.g||0))}));
+  peRender();
+}
+// ── 編譯成 blueprint ──
+function peCompile(){
+  peSync();
+  const id=peState.editId||('plan'+Date.now().toString(36));
+  const S=peState.stns, D={};
+  const spine=S.map((s,i)=>{
+    // src→refill(不收空框)、sink→changer(空框人員收走)，其餘照選的來
+    const type = s.type==='src'?'refill' : s.type==='sink'?'changer' : s.type;
+    const c={role:'s'+i, type, name:s.name, xi:i};
+    if(type==='buffer'){ c.bufKey=`${id}_b${i}`; D[c.bufKey]=Math.max(1,s.val); }
+    else{
+      c.procKey=`${id}_p${i}`; D[c.procKey]=Math.max(1,s.val);
+      if(type!=='refill'){ c.countKey=`${id}_n${i}`; D[c.countKey]=clampInt(s.n||1,1,9); }
+      if(s.type==='src'){ c.noReturn=true; c.dropEmpty=true; }        // 人員投滿框，AGV 拿走就好
+      else if(s.type==='sink'){ c.dropEmpty=true; }                    // 放滿框即完成，空框人員收走
+      else if(s.empty==='self'){ c.selfReturn=true; c.selfRetKey=`${id}_r${i}`; D[c.selfRetKey]=30; }
+      else if(s.empty==='drop'){ c.dropEmpty=true; if(type==='refill') c.noReturn=true; }
+      // 起始收空框（畫面上也能點那一格切換），預設有
+      if(type==='transfer'){ c.seedKey=`${id}_s${i}`; D[c.seedKey]=(s.seed==null?1:(s.seed?1:0)); }
+    }
     return c;
   });
-  const routeParams=[]; for(let k=0;k<n-1;k++) routeParams.push({key:`${id}_seg${k}`,label:`${sts[k].name} ↔ ${sts[k+1].name}`,seg:'s'+k,pair:[k,k+1]});
-  const gs=wzGroups();
-  // 回框直達：每個有中間緩衝站的群組，補一條 src↔dst 直達路段（空框回程跳過緩衝站）
-  gs.forEach(g=>{ if(g.midIdx==null) return; const a=g.srcIdx,b=g.dstIdx;
-    routeParams.push({key:`${id}_d${a}_${b}`,label:`${sts[a].name} ↔ ${sts[b].name} 直達(回程)`,seg:`d${a}_${b}`,pair:[a,b]}); });
-  const groups=gs.map((g,k)=>{
-    const o={grp:k+1,src:role(g.srcIdx),dst:role(g.dstIdx),agvKey:`${id}_g${k}`,priA:8,mid:null};
-    if(g.midIdx!=null){ o.mid=role(g.midIdx); o.priB=9; o.midSpace='pending'; }
-    return o;
+  const groups=peState.teams.map((q,k)=>{
+    const agvKey=`${id}_g${k}`; D[agvKey]=clampInt(q.n||1,1,9);
+    const tasks=peState.tasks.filter(t=>(t.g||0)===k)
+      .map(t=>({f:'s'+t.f, t:'s'+t.t, c:t.c||'full'}));
+    return {grp:k+1, agvKey, agvLabel:`AGV ${q.name}（${tasks.map(t=>`${S[+t.f.slice(1)].name}→${S[+t.t.slice(1)].name}`).join('、')||'無任務'}）`, tasks};
   });
-  const defaults={};
-  defaults[`${id}_bt`]=wizState.batch; defaults[`${id}_pk`]=wizState.pick; defaults[`${id}_dp`]=wizState.drop;
-  defaults[`${id}_bpk`]=wizState.pick; defaults[`${id}_bdp`]=wizState.drop;
-  sts.forEach((s,i)=>{ if(s.type==='buffer') defaults[`${id}_b${i}`]=s.val; else { defaults[`${id}_p${i}`]=s.val; if(s.type!=='refill') defaults[`${id}_n${i}`]=1; } });
-  for(let k=0;k<n-1;k++) defaults[`${id}_seg${k}`]=wizState.seg;
-  gs.forEach(g=>{ if(g.midIdx!=null) defaults[`${id}_d${g.srcIdx}_${g.dstIdx}`]=wizState.seg*(g.dstIdx-g.srcIdx); }); // 直達回程預設 = 跨越段數×每段
-  gs.forEach((g,k)=>{ defaults[`${id}_g${k}`]=wizState.agv['g'+k]||2; });
-  const gap=Math.max(150,Math.round((1315-85)/Math.max(1,n-1))), width=Math.max(1400, 85+(n-1)*gap+120);
-  const sinkIdx=sts.map((s,i)=>i).filter(i=>sts[i].type==='changer').pop();
+  Object.assign(D,{[`${id}_bt`]:peState.batch, [`${id}_pk`]:peState.pick, [`${id}_dp`]:peState.drop,
+                   [`${id}_bpk`]:peState.pick, [`${id}_bdp`]:peState.drop});
+  // 每一條任務都給一格可調的走行時間，預設＝圖上兩點直線距離 × 秒/像素
+  const routeParams=[], seen={};
+  for(const t of peState.tasks){
+    const a=Math.min(t.f,t.t), b=Math.max(t.f,t.t);
+    if(a===b || !S[a] || !S[b]) continue;                 // 站內回空框另有自己的參數
+    const k=`${id}_${a}_${b}`; if(seen[k]) continue; seen[k]=1;
+    routeParams.push({key:k, label:`${S[a].name} ↔ ${S[b].name}`,
+      seg: b===a+1?('s'+a):`d${a}_${b}`, pair:[a,b]});
+    D[k]=Math.max(1, Math.round(Math.hypot(S[a].x-S[b].x, S[a].y-S[b].y)*peState.secPerUnit));
+  }
+  const W=peState.bgW||1200, H=peState.bgH||700;
+  const sink=S.map((s,i)=>i).filter(i=>S[i].type==='changer').pop();
   return {
-    id, name:wizState.name||id, color:wizState.color, flowSummary:sts.map(s=>s.name).join(' → '),
+    id, name:peState.name||id, color:peState.color, custom:true, schemaVersion:2,
+    sinkRole: sink!=null?'s'+sink:null,
+    flowSummary:S.map(s=>s.name).join(' → '),
     batchKey:`${id}_bt`, pickKey:`${id}_pk`, dropKey:`${id}_dp`, bufPickKey:`${id}_bpk`, bufDropKey:`${id}_bdp`,
-    sinkRole: sinkIdx!=null?role(sinkIdx):null,
-    routeParams, spine, groups, defaults, custom:true, schemaVersion:1,
-    layout:{type:'row', xiCount:n, gap, zones:gs.map(g=>[g.srcIdx,g.dstIdx]), header:wizState.name||id, baseVB:`0 0 ${width} 870`,
-      simple:{rows:[sts.map((_,i)=>i)], rowY:[280], rowTrack:[[160,182]], viewBox:`0 0 ${width} 460`, legendY:430}}
+    routeParams, spine, groups, defaults:D,
+    // 存原始編輯狀態供再編輯；底圖不重複存（從 layout.bg 借回來），否則 localStorage 很快就爆
+    planSrc: JSON.parse(JSON.stringify({...peState, editId:null, bg:null})),
+    layout:{ type:'plan', xiCount:S.length, secPerUnit:peState.secPerUnit, planScale:1,
+      pos:S.map(s=>[s.x,s.y]),
+      zones:S.map((_,i)=>[i,i]), zoneGrp:S.map((_,i)=>{
+        const t=peState.tasks.find(t=>t.f===i)||peState.tasks.find(t=>t.t===i);
+        return ((t&&t.g)||0)+1; }),
+      bg: peState.bg?{href:peState.bg, w:W, h:H}:null,
+      header:peState.name||id, baseVB:`0 0 ${W} ${H}`,
+      simple:{ rows:[S.map((_,i)=>i)], rowY:[280], rowTrack:[[160,182]], viewBox:`0 0 1400 460`, legendY:430 } },
   };
 }
-function wzDryRun(){
-  const bp=wzCompile(), v=validateBlueprint(bp);
-  if(!v.ok){ setWzMsg('驗證未過：\n• '+v.errors.join('\n• '),'err'); return; }
-  const dr=dryRunBlueprint(bp);
-  setWzMsg(dr.msg, dr.ok?'ok':'err');
+function peDryRun(){
+  const bp=peCompile(), v=validateBlueprint(bp);
+  if(!v.ok){ setPeMsg('驗證未過：\n• '+v.errors.join('\n• '),'err'); return; }
+  const Psnap={...P}; Object.assign(P,bp.defaults);
+  const dr=dryRunBlueprint(bp); P=Psnap;
+  setPeMsg(dr.msg, dr.ok?'ok':'err');
 }
-function wzSave(){
-  const bp=wzCompile();
-  if(wizState.editId) delete BLUEPRINTS[wizState.editId]; // 編輯：先移除舊版再重加
+function peSave(){
+  const bp=peCompile();
+  if(peState.editId) delete BLUEPRINTS[peState.editId];
   const res=addCustomLine(bp);
-  if(!res.ok){ if(wizState.editId) loadCustomLines(); setWzMsg(res.msg,'err'); return; }
-  closeWizard(); renderLineSelect(); renderParamPanel();
+  if(!res.ok){ if(peState.editId) loadCustomLines(); setPeMsg(res.msg,'err'); return; }
+  closePlanEd(); renderLineSelect(); renderParamPanel();
   toast(res.msg,'ok');
 }
 function selectLine(line){
   selectedLine = line;
   document.getElementById('sel-ov').style.display = 'none';
   document.getElementById('ttl').textContent =
-    '欣興電子 ' + ((BLUEPRINTS[line] && BLUEPRINTS[line].name) || line) + ' AGV 模擬';
+    ((BLUEPRINTS[line] && BLUEPRINTS[line].name) || line) + '　流程計算系統';
   applyLineFilter();
   buildRouteMap(); // 路段示意圖依作用線重建（ABF / SMK）
   refreshDirty();
@@ -3312,7 +3887,7 @@ function setupKeyboard(){
       // 確認彈窗優先
       const cov=document.getElementById('confirm-ov');
       if(cov&&cov.classList.contains('show')){ if(cov._onEsc)cov._onEsc(); return; }
-      if(document.getElementById('line-wizard').classList.contains('show')){ closeWizard(); return; }
+      if(document.getElementById('plan-editor').classList.contains('show')){ closePlanEd(); return; }
       if(document.getElementById('cmp-table-ov').classList.contains('show')){ closeComparison(); return; }
       if(agvBoardOpen){ toggleAgvBoard(); return; }
       const ov=document.getElementById('ov');
