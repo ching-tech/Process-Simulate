@@ -8,7 +8,8 @@ const externals=[...html.matchAll(/<script src="([^"]+)"><\/script>/g)]
   .filter(p=>fs.existsSync(p) && !/chart/.test(p))
   .map(p=>fs.readFileSync(p,'utf8')).join('\n');
 const src=externals+'\n'+[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n')
-  + ';globalThis.__x={BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLineConfig,applyDefaults:d=>Object.assign(P,d)};';
+  + ';globalThis.__x={BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLineConfig,'
+  + 'planSrcFromBlueprint,peCompile,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
 const stub=new Proxy(function(){},{
   get:(t,k)=> k===Symbol.toPrimitive?(()=>0) : k===Symbol.toStringTag?'stub' : stub,
   set:()=>true, apply:()=>stub, construct:()=>stub});
@@ -47,6 +48,29 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
   const dr=dryRunBlueprint(bp);
   assert.ok(dr.ok, `任務清單型線 ${dr.msg}`);
   console.log(`✓ ${'chk'.padEnd(4)} 4 站 / 4 欄 / 2 組 / AGV ${lc.agvInits.length} 台 — ${dr.msg}（任務清單模式）`);
+}
+
+// PLS 丟進平面版面編輯器再編譯回來，要還是同一條線（同一台設備／走道路徑／路段時間都不能掉）
+{
+  const {planSrcFromBlueprint,peCompile,setPeState}=ctx.__x, pls=BLUEPRINTS.pls;
+  const src=planSrcFromBlueprint(pls);
+  assert.strictEqual(src.stns.length, pls.spine.length, 'PLS 還原成編輯狀態時站數對不上');
+  assert.strictEqual(src.stns.filter(s=>s.same!=null).length, 3, '⑨⑪⑫ 沒被認出是同一台設備');
+  assert.strictEqual(src.teams.length, pls.groups.length, '車隊數對不上');
+  setPeState(src);
+  const cp=peCompile();
+  const v=validateBlueprint(cp);
+  assert.ok(v.ok, 'PLS 複本驗證失敗：'+v.errors.join(' / '));
+  assert.strictEqual(cp.layout.xiCount, pls.layout.xiCount, 'PLS 複本的欄數變了（同一台設備沒併欄）');
+  assert.strictEqual(Object.keys(cp.layout.paths||{}).length,
+                     Object.keys(pls.layout.paths||{}).length, 'PLS 複本掉了走道路徑');
+  const secs=b=>b.routeParams.map(r=>b.defaults[r.key]).sort((x,y)=>x-y).join(',');
+  assert.strictEqual(secs(cp), secs(pls), 'PLS 複本的路段行走時間跟原版不一樣');
+  ctx.__x.applyDefaults(cp.defaults);
+  const dr2=dryRunBlueprint(cp);
+  assert.ok(dr2.ok, 'PLS 複本 '+dr2.msg);
+  console.log(`✓ pls→編輯器→複本  ${cp.spine.length} 站 / ${cp.layout.xiCount} 欄 / `
+    +`同一台 ${src.stns.filter(s=>s.same!=null).length} 組 / 走道 ${Object.keys(cp.layout.paths).length} 段 — ${dr2.msg}`);
 }
 
 // 人員投料站永遠不能被選為空框回程的目的地
@@ -104,6 +128,20 @@ for(const id in BLUEPRINTS){
     if(!c.selfReturn) continue;
     assert.ok(owners[c.role], `${id} ${c.name} 要站內回空框，但沒有任何一隊負責`);
   }
+  // 畫面上每個「收空框」格子都要能點：有那格的站一定要有 seedKey，否則點下去沒反應
+  for(const d of lc.defs){
+    if(d.alias) continue;
+    const hasRecvSlot = d.mtype==='transfer' || (d.mtype==='refill' && !d.noReturn);
+    assert.strictEqual(!!d.seedKey, hasRecvSlot, `${id} ${d.name} 的起始收空框設定對不上畫面`);
+  }
+  // 起始收空框開或關都要能出料：站內回空框曾經在「兩格都有框」時繞成死結
+  const seedKeys=[...new Set(bp.spine.map(c=>c.seedKey).filter(Boolean))];
+  for(const v of [1,0]){
+    ctx.__x.applyDefaults(Object.fromEntries(seedKeys.map(k=>[k,v])));
+    const d2=dryRunBlueprint(bp);
+    assert.ok(d2.ok, `${id} 起始收空框全設 ${v} 時 ${d2.msg}`);
+  }
+  ctx.__x.applyDefaults(Object.fromEntries(seedKeys.map(k=>[k,bp.defaults?(bp.defaults[k]??1):1])));
   const dr=dryRunBlueprint(bp);
   assert.ok(dr.ok, `${id} ${dr.msg}`);
   const cols=new Set(lc.defs.map(d=>d.xi)).size;
