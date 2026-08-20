@@ -305,6 +305,10 @@ html[data-theme=dark] #clk{color:var(--yellow)}
 #coach ul{margin:0 0 8px 18px;line-height:1.7;color:var(--text)}
 #coach .cbtns{display:flex;justify-content:flex-end}
 .unit-hint{font-size:9px;color:var(--dim);margin-left:5px}
+#sb-scroll .pg.pf-off,#sb-scroll .pg.ln-off{display:none}
+#sb-scroll .pg.hit{animation:pghit 1.4s ease-out}
+@keyframes pghit{0%{background:var(--accent);box-shadow:0 0 0 3px var(--accent)}100%{background:transparent;box-shadow:none}}
+#abf-stations g{cursor:pointer}
 </style>
 </head>
 <body>
@@ -341,6 +345,7 @@ html[data-theme=dark] #clk{color:var(--yellow)}
       <div class="hdr-sep"></div>
       <div class="cg" role="group" aria-label="分析與呈現">
         <button onclick="toggleAgvBoard()" aria-label="開啟 AGV 稼動看板">📊 看板</button>
+        <button onclick="pinScenario()" aria-label="釘選目前設定以便比較">📌 釘選</button>
         <button onclick="openComparison()" aria-label="開啟方案比較表">📋 比較</button>
         <button id="btn-present" onclick="togglePresent()" aria-label="切換簡報大字模式（F）">📺 簡報</button>
       </div>
@@ -458,16 +463,19 @@ html[data-theme=dark] #clk{color:var(--yellow)}
       <label>顏色</label><input id="pe-color" type="color" value="#2e8b57" style="width:36px;padding:0;height:26px">
       <label>底圖</label><input id="pe-bg" type="file" accept="image/*" onchange="peLoadBg(event)" style="width:170px;font-size:11px">
       <label title="圖上 1 像素等於幾秒的走行時間">秒/像素</label><input id="pe-spu" type="number" min="0.001" step="0.01" value="0.1" style="width:56px" onchange="peSync()">
+      <label title="用「📏 量距離」量一段已知長度來換算">實際距離</label><input id="pe-cal-m" type="number" min="0" step="0.5" placeholder="公尺" style="width:56px">
+      <label>AGV 速度</label><input id="pe-cal-v" type="number" min="0" step="1" value="60" style="width:56px" title="公尺/分">
     </div>
-    <div class="wsec"><h4>② 機台（在圖上點一下新增，拖曳可搬位置）</h4>
+    <div class="wsec"><h4>② 圖面（點兩下新增機台、拖曳可搬位置；Ctrl+Z 復原）</h4>
+      <div id="pe-tools" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px"></div>
       <div id="pe-canvas-wrap" style="position:relative;overflow:auto;max-height:46vh;border:1px solid var(--border);border-radius:6px;background:var(--card)">
         <div id="pe-canvas" style="position:relative;transform-origin:0 0;cursor:crosshair"></div>
       </div>
-      <table style="margin-top:6px"><thead><tr><th>#</th><th>名稱</th><th>型別</th><th>處理秒／容量</th><th>台數</th><th title="這一站跟前面哪一站是同一台實體設備（圖上只畫一個）">同一台</th><th>空框處理</th><th title="模擬一開始，這一站的收空框位有沒有框">起始空框</th><th></th></tr></thead>
+      <table style="margin-top:6px"><thead><tr><th>#</th><th>名稱</th><th>型別</th><th>處理秒／容量</th><th>台數</th><th title="這一站跟前面哪一站是同一台實體設備（圖上只畫一個）">同一台</th><th>空框處理</th><th title="模擬一開始，這一站的收空框位有沒有框">起始空框</th><th></th><th></th></tr></thead>
       <tbody id="pe-stns"></tbody></table>
     </div>
     <div class="wsec"><h4>③ 搬運任務（哪一站 → 哪一站，誰做）</h4>
-      <table><thead><tr><th>來源</th><th></th><th>目的</th><th>載什麼</th><th>指派</th><th></th></tr></thead>
+      <table><thead><tr><th>來源</th><th></th><th>目的</th><th>載什麼</th><th>指派</th><th></th><th></th></tr></thead>
       <tbody id="pe-tasks"></tbody></table>
       <button class="mini" onclick="peAddTask()" style="margin-top:6px">＋ 新增任務</button>
     </div>
@@ -478,6 +486,7 @@ html[data-theme=dark] #clk{color:var(--yellow)}
       <label>取料(秒)</label><input id="pe-pick" type="number" min="0" value="30" style="width:50px">
       <label>放料(秒)</label><input id="pe-drop" type="number" min="0" value="30" style="width:50px">
     </div>
+    <div id="pe-lint" style="margin:6px 0"></div>
     <div id="pe-msg"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button class="mini" id="pe-cancel">關閉</button>
@@ -488,7 +497,7 @@ html[data-theme=dark] #clk{color:var(--yellow)}
 </div>
 <div id="ov" role="dialog" aria-modal="true" aria-labelledby="ovh"><h2 id="ovh">模擬完成</h2><p id="ovm"></p>
   <div class="ov-actions">
-    <button class="pri" onclick="pinScenario();toast('已釘選此方案','ok')" aria-label="釘選此方案以比較">📌 釘選此方案</button>
+    <button class="pri" onclick="pinScenario()" aria-label="釘選此方案以比較">📌 釘選此方案</button>
     <button onclick="openComparison()" aria-label="開啟方案比較">📋 比較表</button>
     <button onclick="exportResultPNG()" aria-label="匯出 PNG 圖片報告">🖼 匯出 PNG</button>
     <button onclick="exportResultCSV()" aria-label="匯出 CSV 資料">⬇ CSV</button>
@@ -1478,7 +1487,8 @@ function refreshBottleneck(){
   const piles=abfSt.filter(s=>(s.pileT||0)>BNK_TH).sort((a,b)=>(b.pileT||0)-(a.pileT||0));
   setVitalsBnk(piles.length);
   if(!piles.length){ bl.innerHTML='<div class="nob">目前無瓶頸</div>'; renderAdvice([]); _announcedBnk.clear(); return; }
-  bl.innerHTML=piles.map(s=>`<div style="margin-bottom:4px">`
+  bl.innerHTML=piles.map(s=>`<div style="margin-bottom:4px;cursor:pointer" title="點一下跳到這一站的參數"`
+    +` onclick="openStnParams(${abfSt.indexOf(s)})">`
     +`<div style="display:flex;justify-content:space-between;align-items:center">`
     +`<span class="bb">堆積</span><span style="font-size:11px;margin:0 4px;flex:1">${s.name}</span>`
     +`<span style="color:var(--red);font-size:12px;font-weight:bold">${Math.round(s.pileT)}s</span></div>`
@@ -2398,8 +2408,9 @@ function buildABFSVG(){
       makeSlot(g,s.x+46, ry,`abf-slot-${i}-in_ret`, '退空框',30,26);
     }
 
-    // 站別 UPH tooltip hover
-    g.style.cursor='help';
+    // 滑過看 UPH、點一下跳到這一站的參數
+    g.style.cursor='pointer';
+    g.addEventListener('click',()=>{ if(!dragMoved) openStnParams(i); });
     g.addEventListener('mouseenter',e=>showStnTip(i,e));
     g.addEventListener('mousemove',e=>moveStnTip(e));
     g.addEventListener('mouseleave',hideStnTip);
@@ -3029,6 +3040,31 @@ const SECTIONS=[
 let scnStore=null, cmpState=null, liveMarks=[];
 
 // ── 面板渲染（資料驅動）──
+// 參數面板的過濾：搜尋字串 ＋「只看改過的」
+let paramFilter='';
+function applyParamFilter(){
+  const q=(paramFilter||'').trim().toLowerCase();
+  const dirtyOnly=!!(document.getElementById('pf-dirty')||{}).checked;
+  let shown=0, total=0;
+  for(const pg of document.querySelectorAll('#sb-scroll .pg')){
+    if(pg.classList.contains('ln-off')) continue;      // 不是作用線的欄位，本來就不顯示
+    const key=(pg.id||'').slice(3);
+    const lbl=(pg.querySelector('label')||{}).textContent||'';
+    total++;
+    const hitQ = !q || lbl.toLowerCase().includes(q) || key.toLowerCase().includes(q);
+    const changed = key in P && key in DEF && P[key]!==DEF[key];
+    const ok = hitQ && (!dirtyOnly || changed);
+    pg.classList.toggle('pf-off', !ok);
+    if(ok) shown++;
+  }
+  // 整段都被濾掉就把段落也收起來
+  for(const sec of document.querySelectorAll('#sb-scroll .sec')){
+    const any=[...sec.querySelectorAll('.pg')].some(p=>!p.classList.contains('pf-off'));
+    sec.style.display=any?'':'none';
+  }
+  const c=document.getElementById('pf-cnt');
+  if(c) c.textContent=(q||dirtyOnly)?`${shown}/${total}`:'';
+}
 function fieldHTML(m){
   const id='p-'+m.key;
   const tag=m.apply==='live'?'<span class="ptag live">⚡即時</span>':'<span class="ptag resim">↻重跑</span>';
@@ -3058,6 +3094,11 @@ function renderParamPanel(){
   const scroll=document.getElementById('sb-scroll');
   const opts=Object.keys(scnStore.presets).map(n=>`<option value="${n}">${n}</option>`).join('');
   let html=`<div id="sbttl" style="margin-bottom:10px">⚙ 模擬參數</div>`;
+  // 一條線動輒 50+ 個參數，先給搜尋與「只看改過的」再說
+  html+=`<div class="phd" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">`
+    +`<input id="pf-q" placeholder="搜尋參數…" oninput="paramFilter=this.value;applyParamFilter()" style="flex:1;min-width:110px">`
+    +`<label class="chk" style="font-size:11px"><input type="checkbox" id="pf-dirty" onchange="applyParamFilter()">只看改過的</label>`
+    +`<span id="pf-cnt" style="font-size:10px;color:var(--dim)"></span></div>`;
   html+=`<div class="phd"><label style="font-size:11px;color:var(--dim);display:block;margin-bottom:4px">📋 情境</label>`
     +`<select id="scenario-sel" onchange="onScenarioPick(this.value)">${opts}</select>`
     +`<button onclick="saveScenarioAs()" class="mini" style="width:100%;margin-top:6px">另存為情境…</button></div>`;
@@ -3071,6 +3112,7 @@ function renderParamPanel(){
       +`<div class="sec-b">${mapHTML}${fields.map(fieldHTML).join('')}</div></div>`;
   }
   scroll.innerHTML=html;
+  const q=document.getElementById('pf-q'); if(q) q.value=paramFilter||'';
   document.getElementById('sb-ft').innerHTML=
     `<div id="dirty-ind" class="clean"></div>`
     +`<div class="ftrow"><button id="btn-apply" onclick="applyP()">套用</button>`
@@ -3104,13 +3146,9 @@ function restoreSecState(){
 function applyLineFilter(){
   document.querySelectorAll('#sb-scroll .pg').forEach(pg=>{
     const ln=pg.getAttribute('data-line');
-    pg.style.display=(ln==='both'||ln===selectedLine)?'':'none';
+    pg.classList.toggle('ln-off', !(ln==='both'||ln===selectedLine));
   });
-  SECTIONS.forEach(s=>{
-    const sec=document.getElementById('sec-'+s.id);if(!sec)return;
-    const any=PARAM_META.some(m=>m.section===s.id&&(m.line==='both'||m.line===selectedLine));
-    sec.style.display=any?'':'none';
-  });
+  applyParamFilter();          // 段落的顯示/隱藏交給它一起算
 }
 function stepField(key,dir){
   const m=PARAM_BY_KEY[key];const el=document.getElementById('p-'+key);
@@ -3380,13 +3418,14 @@ function exportResultCSV(){
 // ── 方案比較表（session 內累積，純呈現） ──
 let pinnedScenarios=[];
 function pinScenario(){
-  if(!selectedLine || (typeof abfPcs==='undefined') || abfPcs<=0){ toast('尚無結果可釘選','err'); return; }
+  if(!selectedLine || (typeof abfPcs==='undefined') || abfPcs<=0){ toast('還沒有結果可以釘選，先跑一段模擬','err'); return; }
   const R=gatherResults();
   const etaSec=(R.uph>0&&R.done<R.target)?(R.simT+(R.target-R.done)/R.uph*3600):(R.reached?R.simT:Infinity);
   const label=(scnStore&&scnStore.active)?scnStore.active:R.line;
   pinnedScenarios.push({label,done:R.done,uph:R.uph,etaSec,etaTxt:R.reached?'已達標':R.eta,
     worst:R.worst?R.worst.name:'—',avgUtil:Math.round(R.avgUtil*100)});
   if(document.getElementById('cmp-table-ov').classList.contains('show')) renderComparisonTable();
+  toast(`已釘選「${label}」（第 ${pinnedScenarios.length} 個方案）`,'ok');
 }
 function removePinned(i){ pinnedScenarios.splice(i,1); renderComparisonTable(); }
 function openComparison(){ const ov=document.getElementById('cmp-table-ov'); ov.classList.add('show'); renderComparisonTable(); trapFocus(ov.querySelector('.ctx')); }
@@ -3405,6 +3444,39 @@ function renderComparisonTable(){
     +row('最重瓶頸',p=>`<td>${p.worst}</td>`)
     +row('平均 AGV 稼動',p=>`<td>${p.avgUtil}%</td>`)
     +`</tbody></table>`;
+}
+
+// ── 從畫面上的機台／瓶頸清單，直接跳到它的參數 ──
+// 同一欄可能有兩個製程步驟（同一台設備），兩邊的 key 都要收
+function stnParamKeys(i){
+  const st=abfSt[i]; if(!st) return [];
+  const bp=BLUEPRINTS[LC.id]||{}, keys=[];
+  for(const c of (bp.spine||[])){
+    if(c.xi!==st.xi) continue;
+    for(const k of [c.countKey,c.procKey,c.bufKey,c.seedKey,c.selfRetKey])
+      if(k && !keys.includes(k)) keys.push(k);
+  }
+  return keys;
+}
+function openStnParams(i){
+  const keys=stnParamKeys(i);
+  if(!keys.length){ toast('這一站沒有可調的參數','err'); return; }
+  const sb=document.getElementById('sb');
+  if(sb && !sb.classList.contains('open')) toggleSB();
+  paramFilter=''; const q=document.getElementById('pf-q'); if(q) q.value='';
+  const dirtyOnly=document.getElementById('pf-dirty'); if(dirtyOnly) dirtyOnly.checked=false;
+  applyParamFilter();
+  let first=null;
+  document.querySelectorAll('#sb-scroll .pg.hit').forEach(e=>e.classList.remove('hit'));
+  for(const k of keys){
+    const pg=document.getElementById('pg-'+k); if(!pg) continue;
+    const sec=pg.closest('.sec'); if(sec) sec.classList.remove('closed');   // 段落收起來就展開
+    pg.classList.remove('hit'); void pg.offsetWidth; pg.classList.add('hit');
+    if(!first) first=pg;
+  }
+  if(first && first.scrollIntoView) first.scrollIntoView({block:'center', behavior:'smooth'});
+  const nm=(abfSt[i].name||'').replace(/_\d+$/,'');
+  toast(`${nm}：${keys.length} 個參數`,'ok');
 }
 
 // ── 瓶頸建議（由既有瓶頸偵測反推設備數） ──
@@ -3688,7 +3760,7 @@ function planSrcFromBlueprint(bp){
   return {editId:null, name:bp.name, batch:val(bp.batchKey)||1, color:bp.color||'#2e8b57',
     pick:val(bp.pickKey)||0, drop:val(bp.dropKey)||0,
     secPerUnit:L.secPerUnit||0.1, planScale:L.planScale||1,
-    srcPaths:L.paths||null, aisles:L.aisles||null,
+    srcPaths:L.paths||null, srcSegs:L.aisles||null, aisles:[],
     bg:(L.bg&&L.bg.href)||null, bgW:(L.bg&&L.bg.w)||0, bgH:(L.bg&&L.bg.h)||0,
     stns, tasks, teams};
 }
@@ -3711,10 +3783,17 @@ function openPlanEd(editId){
   $('pe-name').value=peState.name; $('pe-batch').value=peState.batch;
   $('pe-color').value=peState.color; $('pe-pick').value=peState.pick;
   $('pe-drop').value=peState.drop;  $('pe-spu').value=peState.secPerUnit;
+  peUndo=[]; peLast=null; peMode='move'; peLink=null; peDraft=null; peMeasure=null;
   peRender(); setPeMsg('');
+  peSaved=peLast;                       // 以剛載入的狀態當「沒改過」的基準
   const el=$('plan-editor'); el.classList.add('show'); trapFocus(el.querySelector('.wz'));
 }
-function closePlanEd(){
+function closePlanEd(force){
+  // 改過還沒存就問一句，免得一整份設定按錯就沒了
+  if(!force && peDirty()){
+    confirmDialog('編輯內容還沒儲存，確定要關閉嗎？').then(yes=>{ if(yes) closePlanEd(true); });
+    return;
+  }
   // 先關再收焦點：releaseFocus 萬一出錯也不能讓對話框關不掉
   document.getElementById('plan-editor').classList.remove('show');
   try{ releaseFocus(); }catch(_){}
@@ -3733,20 +3812,245 @@ function peSync(){
   peState.color=$('pe-color').value; peState.pick=+$('pe-pick').value||0;
   peState.drop=+$('pe-drop').value||0; peState.secPerUnit=+$('pe-spu').value||0.1;
 }
+const PE_BG_MAX=1600;   // 底圖最長邊；再大對擺機台沒幫助，只會把 localStorage 撐爆
+// 縮圖 + 轉 JPEG。畫布不能用（jsdom／老瀏覽器）就原樣退回
+function peShrinkBg(im, dataUrl){
+  try{
+    const k=Math.min(1, PE_BG_MAX/Math.max(im.width,im.height));
+    const w=Math.round(im.width*k), h=Math.round(im.height*k);
+    const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+    const cx=cv.getContext('2d'); if(!cx) return {url:dataUrl,w:im.width,h:im.height,cut:false};
+    cx.fillStyle='#fff'; cx.fillRect(0,0,w,h);
+    cx.drawImage(im,0,0,w,h);
+    const out=cv.toDataURL('image/jpeg',0.82);
+    if(!out || out.length>=dataUrl.length) return {url:dataUrl,w:im.width,h:im.height,cut:false};
+    return {url:out, w, h, cut:true};
+  }catch(_){ return {url:dataUrl,w:im.width,h:im.height,cut:false}; }
+}
 function peLoadBg(e){
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader();
   r.onload=ev=>{
     const im=new Image();
-    im.onload=()=>{ peSync(); peState.bg=ev.target.result; peState.bgW=im.width; peState.bgH=im.height; peRender();
-      setPeMsg(`底圖 ${im.width}×${im.height}px 已載入，點圖面新增機台`,'ok'); };
+    im.onload=()=>{
+      peSync();
+      const before=ev.target.result.length, g=peShrinkBg(im, ev.target.result);
+      peState.bg=g.url; peState.bgW=g.w; peState.bgH=g.h; peRender();
+      const kb=n=>Math.round(n/1024)+'KB';
+      setPeMsg(g.cut
+        ? `底圖 ${im.width}×${im.height} → 縮成 ${g.w}×${g.h}（${kb(before)} → ${kb(g.url.length)}），點兩下圖面新增機台`
+        : `底圖 ${g.w}×${g.h}px 已載入（${kb(g.url.length)}），點兩下圖面新增機台`, 'ok');
+    };
     im.onerror=()=>setPeMsg('圖檔讀不出來','err');
     im.src=ev.target.result;
   };
   r.readAsDataURL(f); e.target.value='';
 }
+// ── 即時體檢：一邊編一邊指出會卡死或做白工的地方，不用按「驗證／乾跑」才知道 ──
+// 回傳 {stn:{i:[訊息]}, task:{i:[…]}, team:{i:[…]}, all:[…]}
+function peLint(){
+  const S=peState.stns, T=peState.tasks, M=peState.teams;
+  const out={stn:{}, task:{}, team:{}, all:[]};
+  const add=(kind,i,msg)=>{ if(kind==='all'){ out.all.push(i); return; }   // all 只帶訊息
+    (out[kind][i]=out[kind][i]||[]).push(msg); };
+  if(!S.length){ add('all','還沒有機台：在圖上點兩下新增'); return out; }
+  if(!S.some(x=>x.type==='src'||x.type==='refill')) add('all','沒有起點：要有一個「投料口」或「補料機」');
+  if(!S.some(x=>x.type==='sink'||x.type==='changer')) add('all','沒有計產站：要有一個「出料口」或「換框機」');
+  const nm=i=>`${i+1}. ${S[i]?S[i].name:'?'}`;
+  const isAlias=x=>{ const o=(x.same!=null)?S[x.same]:null; return !!(o&&o.type===x.type&&o.same==null); };
+  S.forEach((x,i)=>{
+    if(x.same!=null && !isAlias(x)) add('stn',i,'「同一台」指到的機台型別不一樣，這個設定不會生效');
+    if(x.type==='buffer') return;
+    const inFull =T.some(t=>t.t===i && t.c!=='empty');
+    const outFull=T.some(t=>t.f===i && t.c!=='empty');
+    if(x.type!=='src' && !inFull)  add('stn',i,'沒有任何任務把滿框送進來，這站永遠不會有料');
+    if(x.type!=='sink' && !outFull) add('stn',i,'沒有任何任務把滿框載走，料進得來出不去');
+    // 空框去向：站內回自己 → 要有一條 f=t 的空框任務；由上游收 → 要有人把空框載走
+    if(x.type==='src'||x.type==='sink') return;
+    if(x.empty==='self'){
+      if(!T.some(t=>t.f===i && t.t===i && t.c==='empty'))
+        add('stn',i,'設定「站內回自己」但沒有任務負責，退空框位會塞死→整站卡住');
+    }else if(x.empty!=='drop'){
+      if(!T.some(t=>t.f===i && t.c==='empty'))
+        add('stn',i,'空框設定「由上游收」但沒有任務把空框載走，退空框位會塞死');
+    }
+  });
+  T.forEach((t,i)=>{
+    const a=S[t.f], b=S[t.t];
+    if(!a||!b){ add('task',i,'來源或目的機台不存在'); return; }
+    if(t.f===t.t && t.c!=='empty') add('task',i,'滿框任務的來源和目的不能是同一站');
+    if(t.f===t.t && t.c==='empty' && a.empty!=='self') add('task',i,'這是站內回空框，來源那站的「空框處理」要選「站內回自己」');
+    if(t.c==='empty' && b.type==='buffer') add('task',i,'烤箱不收空框');
+    if(t.c==='empty' && (b.type==='src'||b.type==='sink')) add('task',i,'投料口／出料口不收空框');
+    if(t.c!=='empty' && a.type==='sink') add('task',i,'出料口不會出滿框');
+    if(M[t.g||0]==null) add('task',i,'指派的隊伍已被刪除');
+  });
+  M.forEach((q,k)=>{ if(!T.some(t=>(t.g||0)===k)) add('team',k,'這一隊沒有任務，車會整場閒置'); });
+  return out;
+}
+const peWarn=list=>list&&list.length
+  ? `<span title="${list.join(' ／ ').replace(/"/g,'&quot;')}" style="color:#e08600;cursor:help">⚠</span>` : '';
+function peRenderLint(L){
+  const box=document.getElementById('pe-lint'); if(!box) return;
+  const rows=[...L.all];
+  for(const k in L.stn) rows.push(`機台 ${+k+1}. ${peState.stns[k]?peState.stns[k].name:''}：${L.stn[k].join('；')}`);
+  for(const k in L.task) rows.push(`任務 ${+k+1}：${L.task[k].join('；')}`);
+  for(const k in L.team) rows.push(`隊伍 ${peState.teams[k]?peState.teams[k].name:+k+1}：${L.team[k].join('；')}`);
+  box.innerHTML = rows.length
+    ? `<div style="border-left:3px solid #e08600;padding:6px 10px;background:#e0860018;border-radius:4px;font-size:11px;line-height:1.6">`
+      +`<b style="color:#e08600">⚠ 體檢 ${rows.length} 項</b><br>`+rows.map(r=>'• '+r).join('<br>')+`</div>`
+    : `<div style="border-left:3px solid var(--green);padding:6px 10px;background:#00853a14;border-radius:4px;font-size:11px">`
+      +`<b style="color:var(--green)">✓ 體檢沒有問題</b></div>`;
+}
+
+// ── 復原：以「每次重繪」為一步，比對前後狀態，不一樣才推進堆疊 ──
+let peUndo=[], peLast=null, peSaved=null;
+const peClone=o=>JSON.parse(JSON.stringify(o));
+function peTrack(){
+  const now=JSON.stringify({s:peState.stns,t:peState.tasks,m:peState.teams,
+                            n:peState.name,b:peState.batch,g:peState.bg});
+  if(peLast!=null && peLast!==now){ peUndo.push(peLast); if(peUndo.length>60) peUndo.shift(); }
+  peLast=now;
+}
+function peUndoStep(){
+  if(!peUndo.length){ setPeMsg('沒有可復原的動作'); return; }
+  const prev=JSON.parse(peUndo.pop());
+  peState.stns=prev.s; peState.tasks=prev.t; peState.teams=prev.m;
+  peState.name=prev.n; peState.batch=prev.b; peState.bg=prev.g;
+  const $=id=>document.getElementById(id);
+  $('pe-name').value=peState.name||''; $('pe-batch').value=peState.batch||1;
+  peLast=null; peRender();              // peRender 會把 peLast 更新成復原後的狀態
+  setPeMsg(`已復原（還可以再退 ${peUndo.length} 步）`);
+}
+function peDirty(){
+  return peSaved!==JSON.stringify({s:peState.stns,t:peState.tasks,m:peState.teams,
+                                   n:peState.name,b:peState.batch,g:peState.bg});
+}
+// ── 複製一台機台 / 一條任務 ──
+function peDupStn(i){
+  const s=peState.stns[i]; if(!s) return;
+  peState.stns.push({...peClone(s), name:s.name+' 複製', same:null, x:s.x+34, y:s.y+34});
+  peRender();
+}
+function peDupTask(i){
+  const t=peState.tasks[i]; if(!t) return;
+  peState.tasks.splice(i+1,0,peClone(t)); peRender();
+}
+// ── 圖面模式：move=拖曳／full,empty=點兩台機台連任務／aisle=畫走道／measure=兩點量距離 ──
+let peMode='move', peLink=null, peDraft=null, peMeasure=null;
+const PE_MODES=[['move','🖱 拖曳','拖機台、點兩下新增'],
+                ['full','🔗 連滿框任務','點來源機台再點目的機台'],
+                ['empty','⭕ 連空框任務','空框回程：點退框的那站再點收框的那站'],
+                ['aisle','🛣 畫走道','沿走道點幾個轉角，按 Enter 或雙擊收尾'],
+                ['measure','📏 量距離','點兩點，輸入實際公尺換算秒/像素']];
+function peSetMode(m){
+  peMode=m; peLink=null; peDraft=null; peMeasure=null;
+  const cv=document.getElementById('pe-canvas');
+  if(cv) cv.style.cursor = m==='move'?'crosshair':'copy';
+  peRender();
+  const d=(PE_MODES.find(x=>x[0]===m)||[])[2]; if(d) setPeMsg(d);
+}
+function peRenderTools(){
+  const el=document.getElementById('pe-tools'); if(!el) return;
+  el.innerHTML=PE_MODES.map(([m,lbl,tip])=>
+      `<button class="mini${peMode===m?' act':''}" title="${tip}" onclick="peSetMode('${m}')"`
+      +`${peMode===m?' style="background:var(--accent);color:#fff;border-color:var(--accent)"':''}>${lbl}</button>`).join('')
+    +`<span style="font-size:11px;color:var(--dim);margin-left:4px">新任務指派給</span>`
+    +`<select onchange="peTeamSel=+this.value" style="font-size:11px">`
+      +peState.teams.map((q,k)=>`<option value="${k}"${k===peTeamSel?' selected':''}>${q.name}</option>`).join('')+`</select>`
+    +(peState.aisles&&peState.aisles.length
+        ? `<span style="font-size:11px;color:var(--dim);margin-left:8px">走道 ${peState.aisles.length} 條</span>`
+          +`<button class="mini rst" onclick="peState.aisles=[];peState.srcPaths=null;peRender()">清除走道</button>` : '')
+    +(peLink!=null?`<span style="font-size:11px;color:var(--accent)">已選來源：${peLink+1}. ${peState.stns[peLink].name}，再點目的</span>`:'');
+}
+let peTeamSel=0;
+// 走道：把畫的折線接成路網，算出每兩站之間的最短路徑（跟 PLS 的走道資料同格式）
+function peBuildAisles(){
+  const polys=(peState.aisles||[]).filter(p=>p.length>=2);
+  if(!polys.length) return null;
+  const SNAP=10, nodes=[], key=p=>`${Math.round(p[0])},${Math.round(p[1])}`;
+  const idx={};
+  const nodeAt=p=>{                                  // 相近的點視為同一個路口
+    for(let i=0;i<nodes.length;i++)
+      if(Math.abs(nodes[i][0]-p[0])<=SNAP && Math.abs(nodes[i][1]-p[1])<=SNAP) return i;
+    nodes.push([p[0],p[1]]); return nodes.length-1;
+  };
+  // 先把所有線段收集起來，交叉處要切開，不然兩條走道畫成十字也不會連通
+  let segs=[];
+  for(const poly of polys) for(let i=0;i+1<poly.length;i++) segs.push([poly[i].slice(),poly[i+1].slice()]);
+  const cross=(a,b)=>{                                // 線段交點（含端點落在另一條線上的情形）
+    const [p,p2]=a, [q,q2]=b;
+    const r=[p2[0]-p[0],p2[1]-p[1]], sv=[q2[0]-q[0],q2[1]-q[1]];
+    const d=r[0]*sv[1]-r[1]*sv[0]; if(Math.abs(d)<1e-9) return null;
+    const t=((q[0]-p[0])*sv[1]-(q[1]-p[1])*sv[0])/d;
+    const u=((q[0]-p[0])*r[1]-(q[1]-p[1])*r[0])/d;
+    if(t<-1e-6||t>1+1e-6||u<-1e-6||u>1+1e-6) return null;
+    return [p[0]+t*r[0], p[1]+t*r[1]];
+  };
+  for(let pass=0; pass<2; pass++){                    // 切兩輪就夠一般手繪的網
+    const next=[];
+    for(let i=0;i<segs.length;i++){
+      let cuts=[];
+      for(let j=0;j<segs.length;j++){ if(i===j) continue;
+        const c=cross(segs[i],segs[j]); if(c) cuts.push(c); }
+      const [a,b]=segs[i];
+      cuts=cuts.filter(c=>Math.hypot(c[0]-a[0],c[1]-a[1])>SNAP && Math.hypot(c[0]-b[0],c[1]-b[1])>SNAP)
+               .sort((x,y)=>Math.hypot(x[0]-a[0],x[1]-a[1])-Math.hypot(y[0]-a[0],y[1]-a[1]));
+      let prev=a;
+      for(const c of cuts){ next.push([prev,c]); prev=c; }
+      next.push([prev,b]);
+    }
+    segs=next;
+  }
+  const adj={};
+  const link=(i,j,w)=>{ (adj[i]=adj[i]||[]).push([j,w]); (adj[j]=adj[j]||[]).push([i,w]); };
+  for(const [a,b] of segs){
+    const i=nodeAt(a), j=nodeAt(b); if(i===j) continue;
+    link(i,j,Math.hypot(nodes[i][0]-nodes[j][0], nodes[i][1]-nodes[j][1]));
+  }
+  // 每一站接到離它最近的走道點（會在該線段上切一刀）
+  const stnNode=[], stnStub=[];
+  peState.stns.forEach((st,si)=>{
+    let best=null;
+    for(const [a,b] of segs){
+      const vx=b[0]-a[0], vy=b[1]-a[1], L2=vx*vx+vy*vy || 1;
+      let t=((st.x-a[0])*vx+(st.y-a[1])*vy)/L2; t=Math.max(0,Math.min(1,t));
+      const px=a[0]+t*vx, py=a[1]+t*vy, d=Math.hypot(st.x-px, st.y-py);
+      if(!best||d<best.d) best={d, p:[px,py], a, b};
+    }
+    if(!best){ stnNode[si]=null; return; }
+    stnStub[si]=best.d;
+    const n=nodeAt(best.p);
+    const ia=nodeAt(best.a), ib=nodeAt(best.b);
+    if(n!==ia) link(n,ia,Math.hypot(nodes[n][0]-nodes[ia][0],nodes[n][1]-nodes[ia][1]));
+    if(n!==ib) link(n,ib,Math.hypot(nodes[n][0]-nodes[ib][0],nodes[n][1]-nodes[ib][1]));
+    stnNode[si]=n;
+  });
+  // Dijkstra：每一站對其他站算一次
+  const paths={};
+  peState.stns.forEach((_,a)=>{
+    const s0=stnNode[a]; if(s0==null) return;
+    const dist={[s0]:0}, prev={}, seen={};
+    for(;;){
+      let u=null, du=Infinity;
+      for(const k in dist){ if(!seen[k] && dist[k]<du){ u=k; du=dist[k]; } }
+      if(u==null) break; seen[u]=1;
+      for(const [v,wgt] of (adj[u]||[])) if(dist[v]==null || du+wgt<dist[v]){ dist[v]=du+wgt; prev[v]=u; }
+    }
+    peState.stns.forEach((_,b)=>{
+      if(b<=a) return;
+      const s1=stnNode[b]; if(s1==null || dist[s1]==null) return;
+      const pts=[]; let cur=String(s1);
+      while(cur!=null){ pts.unshift(nodes[cur]); cur=prev[cur]; }
+      const total=dist[s1]+(stnStub[a]||0)+(stnStub[b]||0);   // 含兩端接上走道的那一小段
+      paths[`${a}_${b}`]={p:pts.map(q=>[Math.round(q[0]),Math.round(q[1])]), len:Math.round(total)};
+    });
+  });
+  return Object.keys(paths).length?paths:null;
+}
 // ── 畫布：底圖 + 機台節點 + 任務連線 ──
 function peRender(){
+  peTrack();
   const cv=document.getElementById('pe-canvas'); if(!cv) return;
   const W=peState.bgW||1200, H=peState.bgH||700;
   const scale=Math.min(1, 980/W);                       // 縮到對話框裝得下
@@ -3765,6 +4069,15 @@ function peRender(){
     h+=`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${col}" stroke-width="3"`
       +`${t.c==='empty'?' stroke-dasharray="9 6" opacity="0.75"':' opacity="0.9"'}/>`;
   });
+  // 走道（已完成的 + 正在畫的）
+  const poly=pts=>pts.map(q=>q.join(',')).join(' ');
+  for(const a of (peState.aisles||[]))
+    h+=`<polyline points="${poly(a)}" fill="none" stroke="#00a86b" stroke-width="5" opacity="0.55"/>`;
+  if(peDraft&&peDraft.length)
+    h+=`<polyline points="${poly(peDraft)}" fill="none" stroke="#00a86b" stroke-width="5"`
+      +` stroke-dasharray="8 6"/>`+peDraft.map(q=>`<circle cx="${q[0]}" cy="${q[1]}" r="5" fill="#00a86b"/>`).join('');
+  if(peMeasure&&peMeasure.length===1)
+    h+=`<circle cx="${peMeasure[0][0]}" cy="${peMeasure[0][1]}" r="6" fill="#e08600"/>`;
   h+='</svg>';
   peState.stns.forEach((s,i)=>{
     const col=s.type==='buffer'?'#b8860b':(s.type==='refill'||s.type==='src')?'#00853a'
@@ -3772,19 +4085,50 @@ function peRender(){
     const o=(s.same!=null&&peState.stns[s.same])?peState.stns[s.same]:null;   // 分身跟著本尊擺
     const x=o?o.x+30:s.x, y=o?o.y+30:s.y;
     h+=`<div class="pe-node${o?' pe-alias':''}" data-i="${i}" style="left:${x}px;top:${y}px;background:${col}`
-      +`${o?';border:2px dashed #fff;opacity:.85':''}">${i+1}. ${s.name}</div>`;
+      +`${o?';border:2px dashed #fff;opacity:.85':''}`
+      +`${peLink===i?';outline:3px solid #ffb300;outline-offset:2px':''}">${i+1}. ${s.name}</div>`;
   });
   cv.innerHTML=h;
-  cv.onclick=ev=>{ if(ev.target!==cv && ev.target.tagName!=='IMG' && ev.target.tagName!=='DIV') return;
+  const at=ev=>{ const r=cv.getBoundingClientRect();
+    return [Math.round((ev.clientX-r.left)/scale), Math.round((ev.clientY-r.top)/scale)]; };
+  cv.onclick=ev=>{
+    if(ev.target.classList.contains('pe-node')) return;   // 機台自己處理
+    if(peMode==='aisle'){ peDraft=peDraft||[]; peDraft.push(at(ev)); peRender(); return; }
+    if(peMode==='measure'){
+      peMeasure=peMeasure||[]; peMeasure.push(at(ev));
+      if(peMeasure.length<2){ peRender(); setPeMsg('再點第二點'); return; }
+      const [a,b]=peMeasure, px=Math.hypot(a[0]-b[0],a[1]-b[1]);
+      peMeasure=null;
+      if(px<5){ peRender(); setPeMsg('兩點太近，重量一次','err'); return; }
+      peCalibrate(px);
+      return;
+    }
+    if(peMode!=='move'){ peLink=null; peRender(); }        // 連線模式點空白＝取消
+  };
+  cv.ondblclick=ev=>{
+    if(peMode==='aisle'){ peFinishAisle(); return; }
+    if(peMode!=='move') return;
+    if(ev.target!==cv && ev.target.tagName!=='IMG' && ev.target.tagName!=='DIV') return;
     if(ev.target.classList.contains('pe-node')) return;
-    const r=cv.getBoundingClientRect();
+    const [x,y]=at(ev);
     peSync();
     peState.stns.push({name:'站'+(peState.stns.length+1), type:peState.stns.length?'transfer':'refill',
-      val:360, n:1, empty:'', x:Math.round((ev.clientX-r.left)/scale), y:Math.round((ev.clientY-r.top)/scale)});
+      val:360, n:1, empty:'', x, y});
     peRender();
   };
   cv.querySelectorAll('.pe-node').forEach(el=>{
+    el.onclick=ev=>{
+      if(peMode!=='full'&&peMode!=='empty') return;
+      ev.preventDefault(); ev.stopPropagation();
+      const i=+el.dataset.i;
+      if(peLink==null){ peLink=i; peRender(); setPeMsg(`來源：${i+1}. ${peState.stns[i].name}，再點目的機台`); return; }
+      peSync();
+      peState.tasks.push({f:peLink, t:i, c:peMode, g:Math.min(peTeamSel, peState.teams.length-1)});
+      const msg=`已新增：${peLink+1}→${i+1}（${peMode==='empty'?'空框':'滿框'}）`;
+      peLink=null; peRender(); setPeMsg(msg,'ok');
+    };
     el.onmousedown=ev=>{
+      if(peMode!=='move') return;
       ev.preventDefault(); ev.stopPropagation();
       const i=+el.dataset.i, r=cv.getBoundingClientRect();
       if(peState.stns[i].same!=null) return;              // 分身位置跟著本尊，不單獨拖
@@ -3795,12 +4139,35 @@ function peRender(){
       document.addEventListener('mousemove',move); document.addEventListener('mouseup',up);
     };
   });
-  peRenderStns(); peRenderTasks(); peRenderTeams();
+  const L=peLint();
+  peRenderTools();
+  peRenderStns(L); peRenderTasks(L); peRenderTeams(L); peRenderLint(L);
+}
+// 走道：收尾一條折線
+function peFinishAisle(){
+  if(!peDraft || peDraft.length<2){ peDraft=null; peRender(); setPeMsg('至少要點兩個點'); return; }
+  peState.aisles=(peState.aisles||[]).concat([peDraft]);
+  peDraft=null;
+  peState.srcPaths=peBuildAisles();                       // 重算站間最短路徑
+  peRender();
+  const n=peState.srcPaths?Object.keys(peState.srcPaths).length:0;
+  setPeMsg(`走道 ${peState.aisles.length} 條，算出 ${n} 組站間路徑`, n?'ok':'err');
+}
+// 兩點校正：量到的像素距離 ＋ 實際公尺 ＋ AGV 速度 → 秒/像素
+function peCalibrate(px){
+  const $=id=>document.getElementById(id);
+  const m=+($('pe-cal-m')||{}).value||0, v=+($('pe-cal-v')||{}).value||0;
+  if(m<=0||v<=0){ peRender(); setPeMsg('請先填「實際距離(公尺)」和「AGV 速度(公尺/分)」再量','err'); return; }
+  const sec=m/v*60;                                       // 走完這段要幾秒
+  const spu=+(sec/px).toFixed(4);
+  peState.secPerUnit=spu; $('pe-spu').value=spu;
+  peRender();
+  setPeMsg(`量到 ${Math.round(px)} 像素＝${m} 公尺；${v} 公尺/分 → ${sec.toFixed(0)} 秒，秒/像素 = ${spu}`,'ok');
 }
 function peStnOpts(sel){ return peState.stns.map((s,i)=>`<option value="${i}"${i===sel?' selected':''}>${i+1}. ${s.name}</option>`).join(''); }
-function peRenderStns(){
+function peRenderStns(L){ L=L||peLint();
   document.getElementById('pe-stns').innerHTML = peState.stns.map((s,i)=>
-     `<tr><td>${i+1}</td>`
+     `<tr${L.stn[i]?' style="background:#e0860014"':''}><td>${i+1}${peWarn(L.stn[i])}</td>`
     +`<td><input value="${s.name}" onchange="peState.stns[${i}].name=this.value;peRender()" style="width:110px"></td>`
     +`<td><select onchange="peState.stns[${i}].type=this.value;peRender()">${PE_TYPES.map(t=>`<option value="${t[0]}"${s.type===t[0]?' selected':''}>${t[1]}</option>`).join('')}</select></td>`
     +`<td>${peIsAlias(s)?`<span title="跟本尊共用" style="color:var(--dim);font-size:11px">同本尊</span>`:`<input type="number" min="1" value="${s.val}" onchange="peState.stns[${i}].val=+this.value" style="width:66px">`}</td>`
@@ -3813,8 +4180,9 @@ function peRenderStns(){
     +`<td>${peNoEmpty(s.type)?'<span style="color:var(--dim);font-size:11px">不用回空框</span>':`<select onchange="peState.stns[${i}].empty=this.value">${PE_EMPTY.map(e=>`<option value="${e[0]}"${(s.empty||'')===e[0]?' selected':''}>${e[1]}</option>`).join('')}</select>`}</td>`
     +`<td>${!peHasSeed(s)?'<span style="color:var(--dim);font-size:11px">—</span>':`<select onchange="peState.stns[${i}].seed=+this.value">`
         +`<option value="1"${peSeedOf(s)?' selected':''}>有</option><option value="0"${peSeedOf(s)?'':' selected'}>無</option></select>`}</td>`
+    +`<td><button class="mini" title="複製這一台" onclick="peDupStn(${i})">⧉</button></td>`
     +`<td><button class="mini rst" onclick="peDelStn(${i})">✕</button></td></tr>`).join('')
-    || '<tr><td colspan="9" style="color:var(--dim);font-size:11px">在上面的圖點一下就會新增機台</td></tr>';
+    || '<tr><td colspan="10" style="color:var(--dim);font-size:11px">在上面的圖點兩下就會新增機台</td></tr>';
 }
 function peDelStn(i){
   peState.stns.splice(i,1);
@@ -3828,9 +4196,9 @@ function peDelStn(i){
   peRender();
 }
 function peAddTask(){ peSync(); peState.tasks.push({f:0,t:Math.min(1,peState.stns.length-1),c:'full',g:0}); peRender(); }
-function peRenderTasks(){
+function peRenderTasks(L){ L=L||peLint();
   document.getElementById('pe-tasks').innerHTML = peState.tasks.map((t,i)=>
-     `<tr><td><select onchange="peState.tasks[${i}].f=+this.value;peRender()">${peStnOpts(t.f)}</select></td>`
+     `<tr${L.task[i]?' style="background:#e0860014"':''}><td>${peWarn(L.task[i])}<select onchange="peState.tasks[${i}].f=+this.value;peRender()">${peStnOpts(t.f)}</select></td>`
     +`<td style="color:var(--dim)">→</td>`
     +`<td><select onchange="peState.tasks[${i}].t=+this.value;peRender()">${peStnOpts(t.t)}</select></td>`
     +`<td><select onchange="peState.tasks[${i}].c=this.value;peRender()">`
@@ -3838,16 +4206,17 @@ function peRenderTasks(){
       +`<option value="empty"${t.c==='empty'?' selected':''}>空框</option></select></td>`
     +`<td><select onchange="peState.tasks[${i}].g=+this.value;peRender()">`
       +peState.teams.map((q,k)=>`<option value="${k}"${k===(t.g||0)?' selected':''}>${q.name}</option>`).join('')+`</select></td>`
+    +`<td><button class="mini" title="複製這一條" onclick="peDupTask(${i})">⧉</button></td>`
     +`<td><button class="mini rst" onclick="peState.tasks.splice(${i},1);peRender()">✕</button></td></tr>`).join('')
-    || '<tr><td colspan="6" style="color:var(--dim);font-size:11px">還沒有任務。來源和目的選同一站＝站內空框回程</td></tr>';
+    || '<tr><td colspan="7" style="color:var(--dim);font-size:11px">還沒有任務。來源和目的選同一站＝站內空框回程</td></tr>';
 }
 function peAddTeam(){ peSync(); peState.teams.push({name:'G'+(peState.teams.length+1), n:2}); peRender(); }
-function peRenderTeams(){
+function peRenderTeams(L){ L=L||peLint();
   document.getElementById('pe-teams').innerHTML = peState.teams.map((q,i)=>
      `<div class="sr"><span style="width:12px;height:12px;border-radius:3px;background:${PE_PAL[i%PE_PAL.length]};display:inline-block"></span>`
     +`<input value="${q.name}" onchange="peState.teams[${i}].name=this.value;peRender()" style="width:70px">`
     +`<span><input type="number" min="1" max="9" value="${q.n}" onchange="peState.teams[${i}].n=+this.value" style="width:44px"> 台</span>`
-    +`<span style="flex:1;font-size:11px;color:var(--dim)">${peState.tasks.filter(t=>(t.g||0)===i).length} 個任務</span>`
+    +`<span style="flex:1;font-size:11px;color:var(--dim)">${peState.tasks.filter(t=>(t.g||0)===i).length} 個任務 ${peWarn(L.team[i])}</span>`
     +`<button class="mini rst" onclick="peDelTeam(${i})">✕</button></div>`).join('');
 }
 function peDelTeam(i){
@@ -3901,8 +4270,10 @@ function peCompile(){
                    [`${id}_bpk`]:peState.pick, [`${id}_bdp`]:peState.drop});
   // 走道路徑：原線的欄編號可能跟這裡重排過，照 oxi 對回去
   const SC=peState.planScale||1, colOxi=[];
-  S.forEach((s,i)=>{ if(own[i]===i && s.oxi!=null) colOxi[col[i]]=s.oxi; });
-  const srcPaths=peState.srcPaths||null;
+  S.forEach((s,i)=>{ if(own[i]===i) colOxi[col[i]] = (s.oxi!=null?s.oxi:i); });
+  // 自己畫的走道：機台搬過就要重算；沒畫的話沿用來源線帶過來的那份
+  const drawn=(peState.aisles&&peState.aisles.length)?peBuildAisles():null;
+  const srcPaths=drawn||peState.srcPaths||null;
   const pathOf=(a,b)=>{
     if(!srcPaths || colOxi[a]==null || colOxi[b]==null) return null;
     const x=Math.min(colOxi[a],colOxi[b]), y=Math.max(colOxi[a],colOxi[b]);
@@ -3939,7 +4310,11 @@ function peCompile(){
     planSrc: JSON.parse(JSON.stringify({...peState, editId:null, bg:null})),
     layout:{ type:'plan', xiCount:nCol, secPerUnit:peState.secPerUnit, planScale:SC,
       pos:Array.from({length:nCol},(_,x)=>{ const i=own.findIndex((o,j)=>col[j]===x); return [S[i].x,S[i].y]; }),
-      aisles:peState.aisles||null, paths:Object.keys(paths).length?paths:null,
+      aisles:(function(){                                   // 折線攤成 [x1,y1,x2,y2]，主畫面才畫得出來
+        const segs=(peState.aisles||[]).flatMap(a=>a.slice(0,-1).map((q,k)=>[q[0],q[1],a[k+1][0],a[k+1][1]]))
+          .concat(peState.srcSegs||[]);
+        return segs.length?segs:null; })(),
+      paths:Object.keys(paths).length?paths:null,
       zones:Array.from({length:nCol},(_,x)=>[x,x]),
       zoneGrp:Array.from({length:nCol},(_,x)=>{
         const hit=peState.tasks.find(t=>col[t.f]===x)||peState.tasks.find(t=>col[t.t]===x);
@@ -3961,7 +4336,7 @@ function peSave(){
   if(peState.editId) delete BLUEPRINTS[peState.editId];
   const res=addCustomLine(bp, true);   // 編輯器存檔：參數以編輯器上的為準，不然改了台數/時間沒反應
   if(!res.ok){ if(peState.editId) loadCustomLines(); setPeMsg(res.msg,'err'); return; }
-  closePlanEd(); renderLineSelect(); renderParamPanel();
+  peSaved=peLast; closePlanEd(true); renderLineSelect(); renderParamPanel();
   toast(res.msg,'ok');
 }
 function selectLine(line){
@@ -4046,7 +4421,10 @@ function setupKeyboard(){
       // 確認彈窗優先
       const cov=document.getElementById('confirm-ov');
       if(cov&&cov.classList.contains('show')){ if(cov._onEsc)cov._onEsc(); return; }
-      if(document.getElementById('plan-editor').classList.contains('show')){ closePlanEd(); return; }
+      if(document.getElementById('plan-editor').classList.contains('show')){
+        if(peMode!=='move'){ peSetMode('move'); return; }   // 先退出目前的畫圖模式
+        closePlanEd(); return;
+      }
       if(document.getElementById('cmp-table-ov').classList.contains('show')){ closeComparison(); return; }
       if(agvBoardOpen){ toggleAgvBoard(); return; }
       const ov=document.getElementById('ov');
@@ -4054,6 +4432,14 @@ function setupKeyboard(){
       if(document.body.classList.contains('present')){ togglePresent(false); return; }
       if(document.getElementById('sb').classList.contains('open')){ toggleSB(); return; }
       return;
+    }
+    // 平面版面編輯器：Enter 收尾走道
+    if(e.key==='Enter' && !typing && document.getElementById('plan-editor').classList.contains('show')
+       && peMode==='aisle'){ e.preventDefault(); peFinishAisle(); return; }
+    // 平面版面編輯器：Ctrl+Z 復原（游標在輸入框裡就讓瀏覽器自己處理）
+    if((e.ctrlKey||e.metaKey) && (e.key==='z'||e.key==='Z') && !typing
+       && document.getElementById('plan-editor').classList.contains('show')){
+      e.preventDefault(); peUndoStep(); return;
     }
     if(typing) return;                 // 打字中：不吃字元捷徑
     // 選擇畫面時不啟用模擬捷徑

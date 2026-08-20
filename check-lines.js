@@ -9,7 +9,7 @@ const externals=[...html.matchAll(/<script src="([^"]+)"><\/script>/g)]
   .map(p=>fs.readFileSync(p,'utf8')).join('\n');
 const src=externals+'\n'+[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n')
   + ';globalThis.__x={BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLineConfig,'
-  + 'planSrcFromBlueprint,peCompile,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
+  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
 const stub=new Proxy(function(){},{
   get:(t,k)=> k===Symbol.toPrimitive?(()=>0) : k===Symbol.toStringTag?'stub' : stub,
   set:()=>true, apply:()=>stub, construct:()=>stub});
@@ -50,9 +50,35 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
   console.log(`✓ ${'chk'.padEnd(4)} 4 站 / 4 欄 / 2 組 / AGV ${lc.agvInits.length} 台 — ${dr.msg}（任務清單模式）`);
 }
 
+// 自己畫的走道：要接成連通的路網，而且距離一定 >= 直線（有繞路才叫走道）
+{
+  const {peBuildAisles,peLint,setPeState}=ctx.__x;
+  setPeState({secPerUnit:0.1, planScale:1, teams:[{name:'G1',n:2}], tasks:[],
+    stns:[{name:'A',type:'src',     val:120,n:1,empty:'',x:100,y:600},
+          {name:'B',type:'buffer',  val:6,  n:1,empty:'',x:500,y:100},
+          {name:'C',type:'transfer',val:180,n:1,empty:'self',x:900,y:600},
+          {name:'D',type:'sink',    val:120,n:1,empty:'',x:1100,y:100}],
+    // 兩條交叉的走道：交叉點要自動切開，否則走不通
+    aisles:[[[100,700],[1100,700]],[[1100,700],[1100,50]],[[1100,50],[500,50]],[[600,700],[600,50]]]});
+  const paths=peBuildAisles();
+  assert.ok(paths, '畫了走道卻算不出路徑');
+  const stns=[[100,600],[500,100],[900,600],[1100,100]];
+  let n=0;
+  for(let a=0;a<4;a++) for(let b=a+1;b<4;b++){
+    const rec=paths[`${a}_${b}`];
+    assert.ok(rec, `走道路網不連通：${a}_${b} 走不到`);
+    const straight=Math.hypot(stns[a][0]-stns[b][0], stns[a][1]-stns[b][1]);
+    assert.ok(rec.len>=straight-2, `${a}_${b} 走道 ${rec.len} 比直線 ${Math.round(straight)} 還短`);
+    assert.ok(rec.p.length>=2, `${a}_${b} 路徑點太少`);
+    n++;
+  }
+  // 交叉口沒切開的話，600 那條直線走道會是孤島 → 上面的連通檢查就會炸
+  console.log(`✓ 走道路網   4 站 / 4 條折線 / ${n} 組站間路徑全部連通，距離都 >= 直線`);
+}
+
 // PLS 丟進平面版面編輯器再編譯回來，要還是同一條線（同一台設備／走道路徑／路段時間都不能掉）
 {
-  const {planSrcFromBlueprint,peCompile,setPeState}=ctx.__x, pls=BLUEPRINTS.pls;
+  const {planSrcFromBlueprint,peCompile,peLint,setPeState}=ctx.__x, pls=BLUEPRINTS.pls;
   const src=planSrcFromBlueprint(pls);
   assert.strictEqual(src.stns.length, pls.spine.length, 'PLS 還原成編輯狀態時站數對不上');
   assert.strictEqual(src.stns.filter(s=>s.same!=null).length, 3, '⑨⑪⑫ 沒被認出是同一台設備');
@@ -64,6 +90,10 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
   assert.strictEqual(cp.layout.xiCount, pls.layout.xiCount, 'PLS 複本的欄數變了（同一台設備沒併欄）');
   assert.strictEqual(Object.keys(cp.layout.paths||{}).length,
                      Object.keys(pls.layout.paths||{}).length, 'PLS 複本掉了走道路徑');
+  assert.strictEqual((cp.layout.aisles||[]).length, (pls.layout.aisles||[]).length, 'PLS 複本掉了走道線段');
+  const lint=peLint();
+  assert.strictEqual(lint.all.length+Object.keys(lint.stn).length
+                    +Object.keys(lint.task).length+Object.keys(lint.team).length, 0, 'PLS 複本被體檢挑出問題');
   const secs=b=>b.routeParams.map(r=>b.defaults[r.key]).sort((x,y)=>x-y).join(',');
   assert.strictEqual(secs(cp), secs(pls), 'PLS 複本的路段行走時間跟原版不一樣');
   ctx.__x.applyDefaults(cp.defaults);
