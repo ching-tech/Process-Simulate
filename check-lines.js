@@ -123,16 +123,20 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
       assert.strictEqual(Math.round(dep(a)), Math.round(dep(c)), `入料側=${f} 時 ${a} 與 ${c} 不同一排`);
       assert.notStrictEqual(Math.round(crs(a)), Math.round(crs(c)), `入料側=${f} 時 ${a} 與 ${c} 疊在一起`);
     }
-    // 入料側那一排要真的貼在入料側那條邊上（在框內、離邊 1/4 深度以內）
-    const half=(d===1?b.h:b.w)/2;
-    assert.ok(Math.abs(dep('in_full')-(1000*sg-half))<half*0.6, `入料側=${f} 時入滿框沒靠在入料側`);
+    // 進料口貼在入料側那條邊、出料口貼在對側邊：都要落在最外面 1/4 深度裡，而且不能凸出框外
+    const {bu,sd,D}=planCardGeom(b,'transfer');
+    assert.ok(bu[0]-sd/2>=0 && bu[0]-sd/2<=10, `入料側=${f} 時進料口沒貼在邊線上（離邊 ${Math.round(bu[0]-sd/2)}）`);
+    assert.ok(D-(bu[2]+sd/2)>=0 && D-(bu[2]+sd/2)<=10, `入料側=${f} 時出料口沒貼在邊線上`);
+    assert.ok(bu[0]<bu[1] && bu[1]<bu[2], `入料側=${f} 時三排順序不對`);
   }
   // 沒有出料端的站（人員投料／換框機）只有一排，也要照同樣順序
   const {slots:rs}=planCardGeom(box('N'),'refill');
   assert.ok(rs.recv[1]<rs.proc[1] && rs.proc[1]<rs.out[1], '人員投料站的格位順序不對');
   const {slots:cs}=planCardGeom(box('E'),'changer');
   assert.ok(cs.in_full[0]>cs.in_proc[0] && cs.in_proc[0]>cs.in_ret[0], '換框機（入料側在右）的格位順序不對');
-  console.log('✓ 機台格位   入料側在上/下/左/右四種擺法，入滿框＋收空框都貼入料側、中間拿料/放置、對側退空/出滿');
+  const {bu:BU,sd:SD,D:DD}=planCardGeom(box('N'),'transfer');
+  console.log(`✓ 機台格位   入料側在上/下/左/右四種擺法都對；進出料口貼邊（深度 ${DD} 的框，`
+    +`口的外緣離邊 ${Math.round(BU[0]-SD/2)}px）`);
 }
 
 // PLS 丟進平面版面編輯器再編譯回來，要還是同一條線（同一台設備／走道路徑／路段時間都不能掉）

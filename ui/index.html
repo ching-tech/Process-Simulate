@@ -471,7 +471,7 @@ html[data-theme=dark] #clk{color:var(--yellow)}
       <label title="圖上 1 像素等於幾公尺。用「📏 量距離」量一段已知長度就會自動算出來，之後機台尺寸都能用公尺填">公尺/像素</label><input id="pe-mpp" type="number" min="0" step="0.001" placeholder="未校正" style="width:64px" onchange="peSetMpp(+this.value)">
       <label title="圖上 1 像素等於幾秒的走行時間">秒/像素</label><input id="pe-spu" type="number" min="0.001" step="0.01" value="0.1" style="width:56px" onchange="peSync()">
       <label title="用「📏 量距離」量一段已知長度來換算">實際距離（公尺）</label><input id="pe-cal-m" type="number" min="0" step="0.5" placeholder="公尺" style="width:56px" aria-label="實際距離，單位公尺">
-      <label title="AGV 走行速度">AGV 速度（公尺/分）</label><input id="pe-cal-v" type="number" min="0" step="1" value="60" style="width:56px" aria-label="AGV 速度，單位公尺每分">
+      <label title="AGV 走行速度。有比例尺的話，改這裡就會重算秒/像素與所有路段時間">AGV 速度（公尺/分）</label><input id="pe-cal-v" type="number" min="0" step="1" value="60" style="width:56px" aria-label="AGV 速度，單位公尺每分" onchange="peSetSpeed(+this.value)">
     </div>
     <div class="wsec"><h4>② 圖面（點兩下新增機台、拖曳搬位置、拖右下角改大小；Ctrl+Z 復原）</h4>
       <div id="pe-tools" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px"></div>
@@ -1951,7 +1951,7 @@ function setupCameraControls(){
 }
 
 // Slot visual helper
-function makeSlot(g, cx, cy, id, label, sw, sh){
+function makeSlot(g, cx, cy, id, label, sw, sh, above){
   const r=ns('rect');
   r.setAttribute('x',cx-sw/2); r.setAttribute('y',cy-sh/2);
   r.setAttribute('width',sw); r.setAttribute('height',sh); r.setAttribute('rx',4);
@@ -1962,7 +1962,7 @@ function makeSlot(g, cx, cy, id, label, sw, sh){
   t.setAttribute('class','slb'); t.setAttribute('style','font-size:12px;font-weight:bold');
   t.setAttribute('id',id+'-v'); t.textContent=''; g.appendChild(t);
   const l=ns('text');
-  l.setAttribute('x',cx); l.setAttribute('y',cy+sh/2+9);
+  l.setAttribute('x',cx); l.setAttribute('y',above?(cy-sh/2-4):(cy+sh/2+9));
   l.setAttribute('class','slb'); l.setAttribute('style','fill:#5a6a85;font-size:10px');
   l.textContent=label; g.appendChild(l);
 }
@@ -2024,13 +2024,20 @@ function planCardGeom(b, mtype){
                        [ C*0.24, ['out_recv','out_proc','out_full'], ['收空框','放置位','出滿框']]]
              : mtype==='changer' ? [[0, ['in_full','in_proc','in_ret'], ['入滿框','拿料位','退空框']]]
              :                     [[0, ['recv','proc','out'],        ['收空框','空框放置','出滿框']]];
-  const bu=[D*0.22, D*0.5, D*0.78];
+  const sd=Math.max(10, Math.min(26, D*0.24));              // 格位在深度方向的大小
+  const sc=Math.max(12, Math.min(34, C*(two?0.40:0.55)));   // 格位在橫向的大小
+  // 進出料口貼著機台邊線（實際機台的口就開在外緣），中間才是機台本體。
+  // 用固定內縮而不是深度比例：機台再長，口還是在牆邊
+  const inset=Math.min(D*0.28, sd/2+6);
+  const bu=[inset, D*0.5, D-inset];
+  // 太小就不標字，免得糊成一團（滑過去還是看得到 tooltip）
+  const room = vert ? ((D*0.5-inset)-sd>=13 && sc>=26) : (C*(two?0.48:1)-sc>=11 && sd>=20);
   const slots={};
   for(const [v,keys] of lanes) keys.forEach((k,j)=>{ slots[k]=pt(bu[j], v); });
-  return {vert, D, C, pt, two, lanes, bu, slots};
+  return {vert, D, C, pt, two, lanes, bu, slots, sd, sc, room};
 }
 function drawPlanStation(g, s, i, gc, b){
-  const {vert, D, C, pt, two, lanes, bu}=planCardGeom(b, s.mtype);
+  const {vert, D, C, pt, two, lanes, bu, sd, sc, room}=planCardGeom(b, s.mtype);
   // 外框＝現場佔地
   const r=ns('rect');
   r.setAttribute('x',b.x-b.w/2);r.setAttribute('y',b.y-b.h/2);
@@ -2072,15 +2079,12 @@ function drawPlanStation(g, s, i, gc, b){
     bf.setAttribute('fill',gc.lbl);bf.setAttribute('id',`abf-bar-${i}`); g.appendChild(bf);
     return;
   }
-  const sd=Math.max(10, Math.min(26, D*0.24));              // 格位在深度方向的大小
-  const sc=Math.max(12, Math.min(34, C*(two?0.40:0.55)));   // 格位在橫向的大小
   const sw=vert?sc:sd, sh=vert?sd:sc;
-  // 太小就不標字，免得糊成一團（滑過去還是看得到 tooltip）
-  const room = vert ? (D*0.28-sd>=11 && sc>=26) : (C*(two?0.48:1)-sc>=11 && sd>=20);
   for(const [v, keys, lbls] of lanes){
     for(let k=0;k<3;k++){
       const c=pt(bu[k], v);
-      makeSlot(g, c[0], c[1], `abf-slot-${i}-${keys[k]}`, room?lbls[k]:'', sw, sh);
+      // 最外側那一排的字標在格子內側，不然會掉到機台框外面
+      makeSlot(g, c[0], c[1], `abf-slot-${i}-${keys[k]}`, room?lbls[k]:'', sw, sh, k===2);
       if(k<2) makeArrowAt(g, pt(bu[k]+sd/2+2, v), pt(bu[k+1]-sd/2-2, v), gc.fwd);
     }
     if(keys[0]==='recv'||keys[0]==='out_recv'){            // 收空框那一格可以點：切換一開始有沒有空框
@@ -3911,7 +3915,7 @@ function planSrcFromBlueprint(bp){
   });
   return {editId:null, name:bp.name, batch:val(bp.batchKey)||1, color:bp.color||'#2e8b57',
     pick:val(bp.pickKey)||0, drop:val(bp.dropKey)||0,
-    secPerUnit:L.secPerUnit||0.1, planScale:L.planScale||1, mPerUnit:L.mPerUnit||0,
+    secPerUnit:L.secPerUnit||0.1, planScale:L.planScale||1, mPerUnit:L.mPerUnit||0, agvSpeed:L.agvSpeed||60,
     srcPaths:L.paths||null, srcSegs:L.aisles||null, aisles:[],
     bg:(L.bg&&L.bg.href)||null, bgW:(L.bg&&L.bg.w)||0, bgH:(L.bg&&L.bg.h)||0,
     stns, tasks, teams};
@@ -3927,7 +3931,7 @@ function openPlanEd(editId){
     peState=planSrcFromBlueprint(bp);
     peState.name=bp.name+' 複本';
   } else {
-    peState={editId:null, name:'', batch:1, color:'#2e8b57', pick:30, drop:30, secPerUnit:0.1, mPerUnit:0,
+    peState={editId:null, name:'', batch:1, color:'#2e8b57', pick:30, drop:30, secPerUnit:0.1, mPerUnit:0, agvSpeed:60,
        bg:null, bgW:0, bgH:0, stns:[], tasks:[], teams:[{name:'G1',n:2}]};
   }
   const $=id=>document.getElementById(id);
@@ -3936,6 +3940,7 @@ function openPlanEd(editId){
   $('pe-color').value=peState.color; $('pe-pick').value=peState.pick;
   $('pe-drop').value=peState.drop;  $('pe-spu').value=peState.secPerUnit;
   $('pe-mpp').value=peState.mPerUnit||'';
+  $('pe-cal-v').value=peState.agvSpeed||60;
   peUndo=[]; peLast=null; peMode='move'; peLink=null; peDraft=null; peMeasure=null;
   peRender(); setPeMsg('');
   peSaved=peLast;                       // 以剛載入的狀態當「沒改過」的基準
@@ -3966,6 +3971,7 @@ function peSync(){
   peState.drop=+$('pe-drop').value||0; peState.secPerUnit=+$('pe-spu').value||0.1;
   // 欄位空著就沿用現值（清空是走 peSetMpp(0)，不是靠這裡）
   peState.mPerUnit=+$('pe-mpp').value || peState.mPerUnit || 0;
+  peState.agvSpeed=+$('pe-cal-v').value || peState.agvSpeed || 0;
 }
 const PE_BG_MAX=1600;   // 底圖最長邊；再大對擺機台沒幫助，只會把 localStorage 撐爆
 // 縮圖 + 轉 JPEG。畫布不能用（jsdom／老瀏覽器）就原樣退回
@@ -4354,18 +4360,36 @@ function peCalibrate(px){
   const mpp=+(m/px).toFixed(4);                           // 比例尺：圖上 1 像素幾公尺
   peState.secPerUnit=spu; $('pe-spu').value=spu;
   peState.mPerUnit=mpp;   $('pe-mpp').value=mpp;
+  peState.agvSpeed=v;
   peRender();
   setPeMsg(`量到 ${Math.round(px)} 像素＝${m} 公尺 → 比例尺 ${mpp} 公尺/像素（機台尺寸現在可以直接填公尺）；`
     +`${v} 公尺/分 → 走完 ${sec.toFixed(0)} 秒，秒/像素 = ${spu}`,'ok');
 }
 // 手動改比例尺。有 AGV 速度就一起把秒/像素換算好，兩個本來就是同一件事
 function peSetMpp(v){
-  const $=id=>document.getElementById(id);
   peState.mPerUnit=v>0?v:0;
-  const sp=+($('pe-cal-v')||{}).value||0;
-  if(v>0 && sp>0){ const spu=+(v/sp*60).toFixed(4); peState.secPerUnit=spu; $('pe-spu').value=spu; }
+  const f=document.getElementById('pe-mpp'); if(f) f.value=peState.mPerUnit||'';
+  const ok=peSyncSpu();
   peRender();
-  setPeMsg(v>0?`比例尺 ${v} 公尺/像素，機台尺寸改用公尺填`:'比例尺清掉了，機台尺寸改用像素填');
+  setPeMsg(v>0?`比例尺 ${v} 公尺/像素，機台尺寸改用公尺填`+(ok?`；秒/像素跟著算成 ${peState.secPerUnit}`:'')
+              :'比例尺清掉了，機台尺寸改用像素填');
+}
+// AGV 速度：有比例尺就重算秒/像素，所有路段時間跟著變
+function peSetSpeed(v){
+  peState.agvSpeed=v>0?v:0;
+  const f=document.getElementById('pe-cal-v'); if(f) f.value=peState.agvSpeed||'';
+  const ok=peSyncSpu();
+  peRender();
+  setPeMsg(ok?`AGV ${v} 公尺/分 × 比例尺 ${peState.mPerUnit} 公尺/像素 → 秒/像素 ${peState.secPerUnit}，路段時間會照這個重算`
+             :'還沒量比例尺，AGV 速度只用來換算「📏 量距離」');
+}
+// 秒/像素 ＝ 比例尺 ÷ 速度。兩個都有才算得出來
+function peSyncSpu(){
+  const m=peState.mPerUnit||0, v=peState.agvSpeed||0;
+  if(!(m>0&&v>0)) return false;
+  peState.secPerUnit=+(m/v*60).toFixed(4);
+  const el=document.getElementById('pe-spu'); if(el) el.value=peState.secPerUnit;
+  return true;
 }
 // 尺寸欄位的顯示：有比例尺就換成公尺
 function peSizeUnit(){ return peState.mPerUnit>0?'m':'px'; }
@@ -4520,7 +4544,9 @@ function peCompile(){
     const da=peDockAt({x:oa.x,y:oa.y,w:oa.w||dza[0],h:oa.h||dza[1],face:oa.face||''});
     const db=peDockAt({x:ob.x,y:ob.y,w:ob.w||dzb[0],h:ob.h||dzb[1],face:ob.face||''});
     const dist=rec ? rec.len*SC : Math.hypot(da[0]-db[0], da[1]-db[1]);
-    routeParams.push({key:k, label:`${oa.name} ↔ ${ob.name}`,
+    const mtr=peState.mPerUnit>0 ? `（${(dist*peState.mPerUnit).toFixed(1)} 公尺`
+                + (peState.agvSpeed>0?` ÷ ${peState.agvSpeed} 公尺/分`:'') + '）' : '';
+    routeParams.push({key:k, label:`${oa.name} ↔ ${ob.name}${mtr}`,
       seg: b===a+1?('s'+a):`d${a}_${b}`, pair:[a,b]});
     D[k]=Math.max(1, Math.round(dist*peState.secPerUnit));
   }
@@ -4539,7 +4565,7 @@ function peCompile(){
     // 存原始編輯狀態供再編輯；底圖不重複存（從 layout.bg 借回來），否則 localStorage 很快就爆
     planSrc: JSON.parse(JSON.stringify({...peState, editId:null, bg:null})),
     layout:{ type:'plan', xiCount:nCol, secPerUnit:peState.secPerUnit, planScale:SC,
-      mPerUnit:peState.mPerUnit||0,
+      mPerUnit:peState.mPerUnit||0, agvSpeed:peState.agvSpeed||0,
       pos:Array.from({length:nCol},(_,x)=>{ const i=own.findIndex((o,j)=>col[j]===x); return [S[i].x,S[i].y]; }),
       size:Array.from({length:nCol},(_,x)=>{ const i=own.findIndex((o,j)=>col[j]===x), d=peDefSize(S[i].type);
         return [S[i].w||d[0], S[i].h||d[1]]; }),
