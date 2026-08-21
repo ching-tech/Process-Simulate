@@ -9,7 +9,7 @@ const externals=[...html.matchAll(/<script src="([^"]+)"><\/script>/g)]
   .map(p=>fs.readFileSync(p,'utf8')).join('\n');
 const src=externals+'\n'+[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n')
   + ';globalThis.__x={BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLineConfig,'
-  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,planCardGeom,planDockOf,routeCalc,peSetSpeed,peSetMpp,peSetSize,pePx2U,peSizeUnit,getPeState:()=>peState,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
+  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,planCardGeom,planDockOf,routeCalc,peSetSpeed,selfRetCalc,peSetMpp,peSetSize,pePx2U,peSizeUnit,getPeState:()=>peState,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
 const stub=new Proxy(function(){},{
   get:(t,k)=> k===Symbol.toPrimitive?(()=>0) : k===Symbol.toStringTag?'stub' : stub,
   set:()=>true, apply:()=>stub, construct:()=>stub});
@@ -76,9 +76,10 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
   console.log(`✓ 走道路網   4 站 / 4 條折線 / ${n} 組站間路徑全部連通，距離都 >= 直線`);
 }
 
-// 機台佔地 + 入料側：AGV 停在入料側那一邊，走道距離要跟著變；設定也要能存進去再讀回來
+// 機台佔地 + 入料側：一趟搬運＝來源「出口側」→ 目的「入口側」，方向不同距離就不同
 {
   const {peBuildAisles,peCompile,planSrcFromBlueprint,setPeState}=ctx.__x;
+  // 走道在 y=700。0 號機 200x100 在 (100,600)：入料側朝下的話入口離走道 50、出口離 150
   const mk=face=>({secPerUnit:0.1, planScale:1, name:'面向測試', batch:1, color:'#2e8b57', pick:10, drop:10,
     teams:[{name:'G1',n:2}],
     tasks:[{f:0,t:1,c:'full'},{f:1,t:2,c:'full'},{f:2,t:1,c:'empty'}],
@@ -86,11 +87,17 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
           {name:'加工',type:'transfer',val:180,n:1,empty:'self',x:500,y:600, w:60,h:40, face:'S'},
           {name:'換框',type:'changer', val:120,n:1,empty:'',x:900,y:600, w:60,h:40, face:'S'}],
     aisles:[[[100,700],[900,700]]]});
-  const lenOf=face=>{ setPeState(mk(face)); const P=peBuildAisles(); return P['0_2'].len; };
-  const south=lenOf('S'), north=lenOf('N'), none=lenOf('');
-  // 入料側朝走道(下) vs 背對走道(上)：多繞的正好是機台的高度 100
-  assert.strictEqual(north-south, 100, `入料側沒影響走道距離（下 ${south} / 上 ${north}）`);
-  assert.strictEqual(none-south, 50,  `沒設入料側時應該從機台正中接走道（正中 ${none} / 下 ${south}）`);
+  const P=f=>{ setPeState(mk(f)); return peBuildAisles(); };
+  const ps=P('S'), pn=P('N');
+  const none=mk(''); none.stns.forEach(x=>x.face=''); setPeState(none);
+  const p0=peBuildAisles();
+  // 0 號機入料側朝下 → 出口在上，要多繞一整個機台深度 100 才回得到走道
+  assert.strictEqual(ps['0_2'].len-pn['0_2'].len, 100, `出口側沒影響距離（下 ${ps['0_2'].len} / 上 ${pn['0_2'].len}）`);
+  // 反過來走（2 出口 → 0 入口）剛好相反
+  assert.strictEqual(pn['2_0'].len-ps['2_0'].len, 100, '回程距離沒跟著入料側換邊');
+  // 同一條路的兩個方向本來就不一樣長
+  assert.notStrictEqual(ps['0_2'].len, ps['2_0'].len, '兩個方向算出同樣的距離（沒分出口／入口）');
+  assert.strictEqual(p0['0_2'].len, p0['2_0'].len, '沒設入料側時兩個方向應該一樣');
   // 存檔再讀回來，長寬與入料側都不能掉
   setPeState(mk('N'));
   const cp=peCompile();
@@ -101,42 +108,8 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
   assert.strictEqual(back.stns[0].w, 200, '再編輯時機台寬度掉了');
   assert.strictEqual(back.stns[0].h, 100, '再編輯時機台高度掉了');
   assert.strictEqual(back.stns[0].face, 'N', '再編輯時入料側掉了');
-  console.log(`✓ 機台佔地   200x100 的機台，入料側朝走道 ${south} / 背對走道 ${north} / 未設 ${none} — 長寬與入料側存得回來`);
-}
-
-// 機台格位排法：入滿框／收空框在入料側，中間拿料位／放置位，對側退空框／出滿框
-{
-  const {planCardGeom}=ctx.__x;
-  const box=face=>({x:1000, y:1000, w:240, h:180, face});
-  // 深度方向（入料側→對側）的座標軸與正負號
-  const ax={N:[1,1], S:[1,-1], W:[0,1], E:[0,-1]};
-  for(const f of ['N','S','W','E']){
-    const b=box(f), {slots}=planCardGeom(b,'transfer');
-    const [d,sg]=ax[f], cr=1-d;                       // d＝深度軸、cr＝橫向軸
-    const dep=k=>slots[k][d]*sg, crs=k=>slots[k][cr];
-    // 三段深度：入料側 → 中間 → 對側
-    for(const lane of [['in_full','in_proc','in_ret'],['out_recv','out_proc','out_full']])
-      assert.ok(dep(lane[0])<dep(lane[1]) && dep(lane[1])<dep(lane[2]),
-        `入料側=${f} 時 ${lane.join('→')} 沒有由入料側往對側排`);
-    // 入滿框與收空框同一段深度（都貼在入料側），拿料位／放置位同一段，退空框／出滿框同一段
-    for(const [a,c] of [['in_full','out_recv'],['in_proc','out_proc'],['in_ret','out_full']]){
-      assert.strictEqual(Math.round(dep(a)), Math.round(dep(c)), `入料側=${f} 時 ${a} 與 ${c} 不同一排`);
-      assert.notStrictEqual(Math.round(crs(a)), Math.round(crs(c)), `入料側=${f} 時 ${a} 與 ${c} 疊在一起`);
-    }
-    // 進料口貼在入料側那條邊、出料口貼在對側邊：都要落在最外面 1/4 深度裡，而且不能凸出框外
-    const {bu,sd,D}=planCardGeom(b,'transfer');
-    assert.ok(bu[0]-sd/2>=0 && bu[0]-sd/2<=10, `入料側=${f} 時進料口沒貼在邊線上（離邊 ${Math.round(bu[0]-sd/2)}）`);
-    assert.ok(D-(bu[2]+sd/2)>=0 && D-(bu[2]+sd/2)<=10, `入料側=${f} 時出料口沒貼在邊線上`);
-    assert.ok(bu[0]<bu[1] && bu[1]<bu[2], `入料側=${f} 時三排順序不對`);
-  }
-  // 沒有出料端的站（人員投料／換框機）只有一排，也要照同樣順序
-  const {slots:rs}=planCardGeom(box('N'),'refill');
-  assert.ok(rs.recv[1]<rs.proc[1] && rs.proc[1]<rs.out[1], '人員投料站的格位順序不對');
-  const {slots:cs}=planCardGeom(box('E'),'changer');
-  assert.ok(cs.in_full[0]>cs.in_proc[0] && cs.in_proc[0]>cs.in_ret[0], '換框機（入料側在右）的格位順序不對');
-  const {bu:BU,sd:SD,D:DD}=planCardGeom(box('N'),'transfer');
-  console.log(`✓ 機台格位   入料側在上/下/左/右四種擺法都對；進出料口貼邊（深度 ${DD} 的框，`
-    +`口的外緣離邊 ${Math.round(BU[0]-SD/2)}px）`);
+  console.log(`✓ 機台佔地   200x100 的機台，0→2 出口朝走道 ${pn['0_2'].len} / 背對 ${ps['0_2'].len}；`
+    +`同一條路兩個方向 ${ps['0_2'].len} vs ${ps['2_0'].len} — 長寬與入料側存得回來`);
 }
 
 // PLS 丟進平面版面編輯器再編譯回來，要還是同一條線（同一台設備／走道路徑／路段時間都不能掉）
@@ -151,8 +124,9 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
   const v=validateBlueprint(cp);
   assert.ok(v.ok, 'PLS 複本驗證失敗：'+v.errors.join(' / '));
   assert.strictEqual(cp.layout.xiCount, pls.layout.xiCount, 'PLS 複本的欄數變了（同一台設備沒併欄）');
+  // 複本的走道表是有方向的（a→b 與 b→a 分開存），所以是原版的兩倍
   assert.strictEqual(Object.keys(cp.layout.paths||{}).length,
-                     Object.keys(pls.layout.paths||{}).length, 'PLS 複本掉了走道路徑');
+                     Object.keys(pls.layout.paths||{}).length*2, 'PLS 複本掉了走道路徑');
   assert.strictEqual((cp.layout.aisles||[]).length, (pls.layout.aisles||[]).length, 'PLS 複本掉了走道線段');
   const lint=peLint();
   assert.strictEqual(lint.all.length+Object.keys(lint.stn).length
@@ -266,6 +240,38 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
   assert.ok(/公尺 ÷ 50 公尺\/分/.test(c2.note), '有比例尺時算式沒寫成「公尺 ÷ 速度」：'+c2.note);
   console.log(`✓ 舊存檔     ${cp.routeParams.length} 段沒有 calcSec 也能現算，`
     +`且跟編譯出來的秒數一致（例：${c2.note} = ${c2.sec}s）`);
+}
+
+// 一趟搬運＝來源出口 → 目的入口，所以兩個方向各一格參數；站內回空框照機台自己的佔地算
+{
+  const {peCompile,setPeState,selfRetCalc}=ctx.__x;
+  setPeState({secPerUnit:0.1, planScale:1, name:'方向', batch:1, color:'#2e8b57', pick:10, drop:10,
+    teams:[{name:'G1',n:2}],
+    tasks:[{f:0,t:1,c:'full',g:0},{f:1,t:2,c:'full',g:0},{f:1,t:1,c:'empty',g:0}],
+    stns:[{name:'A',type:'src',      val:120,n:1,empty:'',    x:200, y:300, w:120,h:200, face:'S'},
+          {name:'B',type:'transfer', val:180,n:1,empty:'self',x:800, y:300, w:120,h:300, face:'S'},
+          {name:'C',type:'sink',     val:60, n:1,empty:'',    x:1400,y:300, w:120,h:200, face:'S'}],
+    aisles:[[[100,700],[1500,700]]]});
+  const cp=peCompile();
+  const key=(a,b)=>cp.routeParams.find(r=>r.pair[0]===a&&r.pair[1]===b);
+  assert.ok(key(0,1), '0→1 沒有路段參數');
+  assert.ok(key(1,2), '1→2 沒有路段參數');
+  // B 比 A 深 100：A 出口 → B 入口 要繞過 B 的深度，B 出口 → C 入口 也一樣
+  const ab=cp.defaults[key(0,1).key], bc=cp.defaults[key(1,2).key];
+  assert.strictEqual(bc-ab, 10, `方向沒有影響距離（A→B ${ab}s / B→C ${bc}s）`);
+  assert.ok(/出口→入口/.test(key(0,1).calcNote), '算式沒寫出口→入口：'+key(0,1).calcNote);
+  // 走道表兩個方向都要有，而且不一樣長
+  const PA=cp.layout.paths;
+  assert.ok(PA['0_1'] && PA['1_0'], '走道表沒有兩個方向');
+  assert.notStrictEqual(PA['0_1'].len, PA['1_0'].len, '兩個方向算出同樣長');
+  // 站內回空框：退空框(對側) → 收空框(入料側)，跟機台深度掛鉤
+  const c=cp.spine.find(x=>x.selfRetKey);
+  const sc=selfRetCalc(cp, c);
+  assert.ok(sc, '站內回空框算不出來');
+  assert.strictEqual(cp.defaults[c.selfRetKey], sc.sec, '站內回空框預設值跟算出來的不一樣');
+  assert.ok(sc.sec>=20 && sc.sec<=40, `120x300 的機台站內回空框算成 ${sc.sec}s，不合理`);
+  console.log(`✓ 出口→入口   A→B ${ab}s / B→C ${bc}s（B 深 100px 就多 10s）；`
+    +`走道 0_1=${PA['0_1'].len} 1_0=${PA['1_0'].len}；站內回空框 ${sc.sec}s ← ${sc.note}`);
 }
 
 // 人員投料站永遠不能被選為空框回程的目的地

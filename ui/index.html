@@ -872,15 +872,20 @@ function genLayout(bp, defs){
 // 通用路段時間：同 xi=0；命中直達捷徑用之；否則相鄰段相加（取代 routeABF/routeSMK）
 // seg/direct 由 routeParams 推導（pair 相鄰=段、否則=直達捷徑）
 function genRoute(bp){
-  const seg=[], direct={};
+  const seg=[], direct={}, dirKey={};
   for(const rp of (bp.routeParams||[])){
     const [a,b]=rp.pair;
-    if(b===a+1) seg[a]=rp.key; else direct[`${a}_${b}`]=rp.key;
+    if(!(`${a}_${b}` in dirKey)) dirKey[`${a}_${b}`]=rp.key;         // 有方向的（平面版面線）
+    const lo=Math.min(a,b), hi=Math.max(a,b);
+    if(hi===lo+1){ if(seg[lo]===undefined) seg[lo]=rp.key; }
+    else if(!(`${lo}_${hi}` in direct)) direct[`${lo}_${hi}`]=rp.key;
   }
   return (i,j)=>{
     if(i===j) return P[abfSt[i]?.selfRetKey]||0;   // 站內回程：入料端→出料端
     const xi=abfSt[i]?.xi ?? i, xj=abfSt[j]?.xi ?? j;
     if(xi===xj) return 0;
+    const dk2=dirKey[`${xi}_${xj}`] || dirKey[`${xj}_${xi}`];        // 這個方向沒開參數就借反向的
+    if(dk2) return P[dk2]||0;
     const a=Math.min(xi,xj), b=Math.max(xi,xj), dk=`${a}_${b}`;
     if(dk in direct) return P[direct[dk]]||0;
     // 沒開參數的組合（AGV 空車去取料會走到）：有平面圖距離就直接用，不要沿欄位硬加總
@@ -894,6 +899,13 @@ function genProcTime(bp){
   const m={}; bp.spine.forEach(c=>{ if(c.procKey) m[c.xi]=c.procKey; });
   return (d)=> { const k=m[d.xi]; return k!=null ? (P[k]||0) : 360; };
 }
+// 走道路徑查表：a→b 有存就用，沒有才拿 b→a 反過來（舊存檔／內建線是無方向的）
+function planPathAt(PA, a, b){
+  if(!PA) return null;
+  const f=PA[`${a}_${b}`]; if(f) return f;
+  const r=PA[`${b}_${a}`];
+  return r ? {p:r.p.slice().reverse(), len:r.len} : null;
+}
 // 依當前 P 產生完整 line config（取代寫死的 LINES）；可傳 line id 或 blueprint 物件
 function buildLineConfig(lineOrBp){
   const bp = (lineOrBp && typeof lineOrBp==='object') ? lineOrBp : (BLUEPRINTS[lineOrBp] || BLUEPRINTS.abf);
@@ -901,7 +913,7 @@ function buildLineConfig(lineOrBp){
   if(!bp.fallbackSec && bp.layout && bp.layout.type==='plan' && bp.layout.pos){
     const p=bp.layout.pos, k=bp.layout.secPerUnit||0.1, sc=bp.layout.planScale||1, PA=bp.layout.paths;
     bp.fallbackSec=(a,b)=>{
-      const rec=PA && PA[`${Math.min(a,b)}_${Math.max(a,b)}`];      // 有走道就照走道長度
+      const rec=planPathAt(PA,a,b);                                 // 有走道就照走道長度
       const d=rec ? rec.len*sc : ((p[a]&&p[b]) ? Math.hypot(p[a][0]-p[b][0],p[a][1]-p[b][1]) : 0);
       return d ? Math.max(5,Math.round(d*k)) : 0;
     };
@@ -2178,14 +2190,11 @@ function planDock(s, out, side){ return planDockOf(planBox(s), out, side); }
 function planRoute(fi,ti,fs,ts){
   const a=abfSt[fi], b=abfSt[ti];
   if(!a||!b) return null;
-  const P0=LC.layout.paths, SC=LC.layout.planScale||1;
-  const key=`${Math.min(a.xi,b.xi)}_${Math.max(a.xi,b.xi)}`;
-  const rec=P0&&P0[key];
+  const SC=LC.layout.planScale||1;
+  const rec=planPathAt(LC.layout.paths, a.xi, b.xi);
   const pa=planDock(a,0,fs||'out')||[a.x,a.y], pb=planDock(b,0,ts||'in')||[b.x,b.y];
   if(!rec) return [pa,pb];
-  const pts=rec.p.map(p=>[p[0]*SC,p[1]*SC]);
-  if(a.xi>b.xi) pts.reverse();
-  return [pa, ...pts, pb];                 // 兩端接回機台的入料側
+  return [pa, ...rec.p.map(p=>[p[0]*SC,p[1]*SC]), pb];   // 兩端接回機台的出口／入口
 }
 // 折線上依比例 t(0~1) 取點
 function alongRoute(pts,t){
@@ -2428,6 +2437,28 @@ function buildABFSVG(){
       const bt=ns('text');bt.setAttribute('x',bx0+px/2);bt.setAttribute('y',by-9);
       bt.setAttribute('class','slb');bt.setAttribute('style','fill:#33405a;font-size:11px');
       bt.textContent=`${m} 公尺`; tg.appendChild(bt);
+    }
+    // 當初是量圖上哪一段換算出來的：標在原地，才驗得了尺寸對不對
+    const cs=LC.layout.calSeg;
+    if(cs&&cs.p&&cs.p.length===2){
+      const [q0,q1]=cs.p;
+      const ml=ns('line');
+      ml.setAttribute('x1',q0[0]);ml.setAttribute('y1',q0[1]);ml.setAttribute('x2',q1[0]);ml.setAttribute('y2',q1[1]);
+      ml.setAttribute('stroke','#e8a33d');ml.setAttribute('stroke-width','4');
+      const mt0=ns('title'); mt0.textContent=`比例尺基準：這一段實際 ${cs.m} 公尺`; ml.appendChild(mt0);
+      tg.appendChild(ml);
+      const vert=Math.abs(q1[1]-q0[1])>Math.abs(q1[0]-q0[0]);
+      for(const q of [q0,q1]){                              // 兩端加端點記號
+        const t=ns('line');
+        t.setAttribute('x1',q[0]-(vert?9:0)); t.setAttribute('y1',q[1]-(vert?0:9));
+        t.setAttribute('x2',q[0]+(vert?9:0)); t.setAttribute('y2',q[1]+(vert?0:9));
+        t.setAttribute('stroke','#e8a33d');t.setAttribute('stroke-width','4');tg.appendChild(t);
+      }
+      const mt=ns('text');
+      mt.setAttribute('x',(q0[0]+q1[0])/2); mt.setAttribute('y',(q0[1]+q1[1])/2-10);
+      mt.setAttribute('class','slb');
+      mt.setAttribute('style','fill:#b3730a;font-size:15px;font-weight:700;paint-order:stroke;stroke:#fff;stroke-width:4px');
+      mt.textContent=`⇔ ${cs.m} 公尺（比例尺基準）`; tg.appendChild(mt);
     }
   }
 
@@ -3174,20 +3205,36 @@ function routeCalc(bp, rp){
   const L=bp.layout;
   if(!L || L.type!=='plan' || !rp.pair) return null;
   const [a,b]=rp.pair, SC=L.planScale||1, k=L.secPerUnit||0.1, pos=L.pos;
-  const rec=L.paths && L.paths[`${Math.min(a,b)}_${Math.max(a,b)}`];
-  // 沒有走道就用兩台機台的停靠點直線距離（跟編譯時算的一樣，不然這裡寫的秒數會跟欄位對不上）
-  const dockAt=x=>{
+  const rec=planPathAt(L.paths, a, b);
+  // 沒有走道就用「來源出口 → 目的入口」的直線距離（跟編譯時同一套，不然秒數會對不上）
+  const dockAt=(x,side)=>{
     if(!pos||!pos[x]) return null;
     const sz=L.size&&L.size[x];
     if(!sz) return pos[x];
-    return planDockOf({x:pos[x][0], y:pos[x][1], w:sz[0], h:sz[1], face:(L.face&&L.face[x])||''}) || pos[x];
+    return planDockOf({x:pos[x][0], y:pos[x][1], w:sz[0], h:sz[1], face:(L.face&&L.face[x])||''},0,side) || pos[x];
   };
-  const pa=dockAt(a), pb=dockAt(b);
+  const pa=dockAt(a,'out'), pb=dockAt(b,'in');
   const dist = rec ? rec.len*SC : (pa&&pb ? Math.hypot(pa[0]-pb[0], pa[1]-pb[1]) : 0);
   if(!dist) return null;
   const note = L.mPerUnit>0
-    ? `${(dist*L.mPerUnit).toFixed(1)} 公尺 ÷ ${L.agvSpeed||'?'} 公尺/分`
-    : `${rec?'走道':'直線'} ${Math.round(dist)} 像素 × ${k} 秒/像素`;
+    ? `出口→入口 ${(dist*L.mPerUnit).toFixed(1)} 公尺 ÷ ${L.agvSpeed||'?'} 公尺/分`
+    : `出口→入口 ${rec?'走道':'直線'} ${Math.round(dist)} 像素 × ${k} 秒/像素`;
+  return {sec:Math.max(1, Math.round(dist*k)), note};
+}
+// 站內回空框「照圖算出來」是幾秒：退空框 → 收空框 的直線距離 × 秒/像素
+function selfRetCalc(bp, c){
+  const L=bp.layout;
+  if(!L || L.type!=='plan' || !L.size || !L.size[c.xi] || !L.pos || !L.pos[c.xi]) return null;
+  const [w,h]=L.size[c.xi], pos=L.pos[c.xi];
+  const g=planCardGeom({x:pos[0], y:pos[1], w, h, face:(L.face&&L.face[c.xi])||''}, 'transfer');
+  const a=g.slots.in_ret, b=g.slots.out_recv;
+  if(!a||!b) return null;
+  const dist=Math.hypot(a[0]-b[0], a[1]-b[1]);
+  const k=L.secPerUnit||0.1;
+  if(!(dist>0) || !(k>0)) return null;
+  const note = L.mPerUnit>0
+    ? `退空框→收空框 ${(dist*L.mPerUnit).toFixed(1)} 公尺 ÷ ${L.agvSpeed||'?'} 公尺/分`
+    : `退空框→收空框 ${Math.round(dist)} 像素 × ${k} 秒/像素`;
   return {sec:Math.max(1, Math.round(dist*k)), note};
 }
 function buildParamMeta(){
@@ -3207,9 +3254,11 @@ function buildParamMeta(){
     out.push({key:bp.dropKey,   label:'放料-機台',  unit:'秒',min:0,step:5,type:'int',apply:'resim',line:L,section:'pickdrop'});
     out.push({key:bp.bufPickKey,label:'取料-烤箱',unit:'秒',min:0,step:5,type:'int',apply:'resim',line:L,section:'pickdrop'});
     out.push({key:bp.bufDropKey,label:'放料-烤箱',unit:'秒',min:0,step:5,type:'int',apply:'resim',line:L,section:'pickdrop'});
-    // 站內空框回程（入料端→出料端）
+    // 站內空框回程（退空框→收空框）
     for(const c of bp.spine){ if(!c.selfRetKey) continue;
-      out.push({key:c.selfRetKey,label:`${c.name} 站內回空框`,unit:'秒',min:0,step:5,type:'int',apply:'resim',line:L,section:'route'});
+      const sc=selfRetCalc(bp, c);
+      out.push({key:c.selfRetKey,label:`${c.name} 站內回空框`,unit:'秒',min:0,step:5,type:'int',apply:'resim',line:L,section:'route',
+        calc:sc&&sc.sec, calcNote:sc&&sc.note});
     }
     // 路段行走時間（由 blueprint routeParams 宣告 label/seg）
     for(const rp of (bp.routeParams||[])){
@@ -4005,7 +4054,7 @@ function planSrcFromBlueprint(bp){
   });
   return {editId:null, name:bp.name, batch:val(bp.batchKey)||1, color:bp.color||'#2e8b57',
     pick:val(bp.pickKey)||0, drop:val(bp.dropKey)||0,
-    secPerUnit:L.secPerUnit||0.1, planScale:L.planScale||1, mPerUnit:L.mPerUnit||0, agvSpeed:L.agvSpeed||60,
+    secPerUnit:L.secPerUnit||0.1, planScale:L.planScale||1, mPerUnit:L.mPerUnit||0, agvSpeed:L.agvSpeed||60, calSeg:L.calSeg||null,
     srcPaths:L.paths||null, srcSegs:L.aisles||null, aisles:[],
     bg:(L.bg&&L.bg.href)||null, bgW:(L.bg&&L.bg.w)||0, bgH:(L.bg&&L.bg.h)||0,
     stns, tasks, teams};
@@ -4022,7 +4071,7 @@ function openPlanEd(editId){
     peState.name=bp.name+' 複本';
   } else {
     peState={editId:null, name:'', batch:1, color:'#2e8b57', pick:30, drop:30, secPerUnit:0.1, mPerUnit:0, agvSpeed:60,
-       bg:null, bgW:0, bgH:0, stns:[], tasks:[], teams:[{name:'G1',n:2}]};
+       calSeg:null, bg:null, bgW:0, bgH:0, stns:[], tasks:[], teams:[{name:'G1',n:2}]};
   }
   const $=id=>document.getElementById(id);
   $('pe-title').textContent = peState.editId?'編輯平面版面線':'平面版面編輯器';
@@ -4281,29 +4330,34 @@ function peBuildAisles(){
     const i=nodeAt(a), j=nodeAt(b); if(i===j) continue;
     link(i,j,Math.hypot(nodes[i][0]-nodes[j][0], nodes[i][1]-nodes[j][1]));
   }
-  // 每一站接到離它最近的走道點（會在該線段上切一刀）
-  const stnNode=[], stnStub=[];
-  peState.stns.forEach((st,si)=>{
+  // 每一站的入料側與出料側各接一個走道點：一趟搬運是「來源出口 → 目的入口」，
+  // 兩邊本來就不同位置，只接一個點的話距離會算錯（機台愈長差愈多）
+  const hook=(pt)=>{
     let best=null;
-    const [sx,sy]=peDock(si)||[st.x,st.y];      // 車是停在入料側，不是機台正中
     for(const [a,b] of segs){
       const vx=b[0]-a[0], vy=b[1]-a[1], L2=vx*vx+vy*vy || 1;
-      let t=((sx-a[0])*vx+(sy-a[1])*vy)/L2; t=Math.max(0,Math.min(1,t));
-      const px=a[0]+t*vx, py=a[1]+t*vy, d=Math.hypot(sx-px, sy-py);
+      let t=((pt[0]-a[0])*vx+(pt[1]-a[1])*vy)/L2; t=Math.max(0,Math.min(1,t));
+      const px=a[0]+t*vx, py=a[1]+t*vy, d=Math.hypot(pt[0]-px, pt[1]-py);
       if(!best||d<best.d) best={d, p:[px,py], a, b};
     }
-    if(!best){ stnNode[si]=null; return; }
-    stnStub[si]=best.d;
+    if(!best) return null;
     const n=nodeAt(best.p);
     const ia=nodeAt(best.a), ib=nodeAt(best.b);
     if(n!==ia) link(n,ia,Math.hypot(nodes[n][0]-nodes[ia][0],nodes[n][1]-nodes[ia][1]));
     if(n!==ib) link(n,ib,Math.hypot(nodes[n][0]-nodes[ib][0],nodes[n][1]-nodes[ib][1]));
-    stnNode[si]=n;
+    return {n, stub:best.d};
+  };
+  const H={in:[], out:[]};
+  peState.stns.forEach((st,si)=>{
+    const b=peBoxOf(si);
+    H.in[si] =hook(peDockAt(b) || [st.x,st.y]);
+    H.out[si]=hook(peDockAt({...b, face:PLAN_OPP[b.face]||b.face}) || [st.x,st.y]);
   });
-  // Dijkstra：每一站對其他站算一次
+  // Dijkstra：從每一站的「出口」出發，走到別站的「入口」。方向不同距離就不同
   const paths={};
   peState.stns.forEach((_,a)=>{
-    const s0=stnNode[a]; if(s0==null) return;
+    const h0=H.out[a]; if(!h0) return;
+    const s0=h0.n;
     const dist={[s0]:0}, prev={}, seen={};
     for(;;){
       let u=null, du=Infinity;
@@ -4312,11 +4366,11 @@ function peBuildAisles(){
       for(const [v,wgt] of (adj[u]||[])) if(dist[v]==null || du+wgt<dist[v]){ dist[v]=du+wgt; prev[v]=u; }
     }
     peState.stns.forEach((_,b)=>{
-      if(b<=a) return;
-      const s1=stnNode[b]; if(s1==null || dist[s1]==null) return;
-      const pts=[]; let cur=String(s1);
+      if(b===a) return;
+      const h1=H.in[b]; if(!h1 || dist[h1.n]==null) return;
+      const pts=[]; let cur=String(h1.n);
       while(cur!=null){ pts.unshift(nodes[cur]); cur=prev[cur]; }
-      const total=dist[s1]+(stnStub[a]||0)+(stnStub[b]||0);   // 含兩端接上走道的那一小段
+      const total=dist[h1.n]+h0.stub+h1.stub;   // 含兩端接上走道的那一小段
       paths[`${a}_${b}`]={p:pts.map(q=>[Math.round(q[0]),Math.round(q[1])]), len:Math.round(total)};
     });
   });
@@ -4348,6 +4402,16 @@ function peRender(){
   if(peDraft&&peDraft.length)
     h+=`<polyline points="${poly(peDraft)}" fill="none" stroke="#00a86b" stroke-width="5"`
       +` stroke-dasharray="8 6"/>`+peDraft.map(q=>`<circle cx="${q[0]}" cy="${q[1]}" r="5" fill="#00a86b"/>`).join('');
+  const cs=peState.calSeg;
+  if(cs&&cs.p&&cs.p.length===2){
+    const [q0,q1]=cs.p;
+    h+=`<line x1="${q0[0]}" y1="${q0[1]}" x2="${q1[0]}" y2="${q1[1]}" stroke="#e8a33d" stroke-width="3"/>`
+      +[q0,q1].map(q=>`<line x1="${q[0]-(q0[1]===q1[1]?0:7)}" y1="${q[1]-(q0[1]===q1[1]?7:0)}"`
+        +` x2="${q[0]+(q0[1]===q1[1]?0:7)}" y2="${q[1]+(q0[1]===q1[1]?7:0)}" stroke="#e8a33d" stroke-width="3"/>`).join('')
+      +`<text x="${(q0[0]+q1[0])/2}" y="${(q0[1]+q1[1])/2-7}" text-anchor="middle"`
+      +` style="fill:#b3730a;font-size:13px;font-weight:700;paint-order:stroke;stroke:#fff;stroke-width:3px">`
+      +`比例尺 ${cs.m} 公尺（圖上 ${cs.px} 像素）</text>`;
+  }
   if(peMeasure&&peMeasure.length===1)
     h+=`<circle cx="${peMeasure[0][0]}" cy="${peMeasure[0][1]}" r="6" fill="#e08600"/>`;
   h+='</svg>';
@@ -4375,7 +4439,7 @@ function peRender(){
       const [a,b]=peMeasure, px=Math.hypot(a[0]-b[0],a[1]-b[1]);
       peMeasure=null;
       if(px<5){ peRender(); setPeMsg('兩點太近，重量一次','err'); return; }
-      peCalibrate(px);
+      peCalibrate(px, [a,b]);
       return;
     }
     if(peMode!=='move'){ peLink=null; peRender(); }        // 連線模式點空白＝取消
@@ -4441,10 +4505,12 @@ function peFinishAisle(){
   setPeMsg(`走道 ${peState.aisles.length} 條，算出 ${n} 組站間路徑`, n?'ok':'err');
 }
 // 兩點校正：量到的像素距離 ＋ 實際公尺 ＋ AGV 速度 → 秒/像素
-function peCalibrate(px){
+function peCalibrate(px, seg){
   const $=id=>document.getElementById(id);
   const m=+($('pe-cal-m')||{}).value||0, v=+($('pe-cal-v')||{}).value||0;
   if(m<=0||v<=0){ peRender(); setPeMsg('請先填「實際距離(公尺)」和「AGV 速度(公尺/分)」再量','err'); return; }
+  // 記下量的是哪一段，圖上標出來才驗得了比例尺對不對
+  if(seg) peState.calSeg={p:[seg[0].slice(), seg[1].slice()], m, px:Math.round(px)};
   const sec=m/v*60;                                       // 走完這段要幾秒
   const spu=+(sec/px).toFixed(4);
   const mpp=+(m/px).toFixed(4);                           // 比例尺：圖上 1 像素幾公尺
@@ -4458,6 +4524,7 @@ function peCalibrate(px){
 // 手動改比例尺。有 AGV 速度就一起把秒/像素換算好，兩個本來就是同一件事
 function peSetMpp(v){
   peState.mPerUnit=v>0?v:0;
+  if(!(v>0)) peState.calSeg=null;
   const f=document.getElementById('pe-mpp'); if(f) f.value=peState.mPerUnit||'';
   const ok=peSyncSpu();
   peRender();
@@ -4493,6 +4560,18 @@ function peSetSize(i,which,v){
   // 用打的就照打的算（PE_MIN 是拖把手時的下限，不該擋住真的很小的機台）
   s[which]=Math.max(8, peU2Px(+v||0));
   peRender();
+}
+// 站內回空框＝從對側的「退空框」搬到入料側的「收空框」。用機台自己的佔地算，
+// 跟跨站搬運同一個秒/像素，機台愈長這一段就愈久
+function peSelfRetDist(i){
+  const b=peBoxOf(i); if(!b) return 0;
+  const g=planCardGeom(b,'transfer');
+  const a=g.slots.in_ret, c=g.slots.out_recv;
+  return (a&&c) ? Math.hypot(a[0]-c[0], a[1]-c[1]) : 0;
+}
+function peSelfRetSec(i){
+  const d=peSelfRetDist(i);
+  return d>0 ? Math.max(1, Math.round(d*peState.secPerUnit)) : 30;
 }
 function peStnOpts(sel){ return peState.stns.map((s,i)=>`<option value="${i}"${i===sel?' selected':''}>${i+1}. ${s.name}</option>`).join(''); }
 function peRenderStns(L){ L=L||peLint();
@@ -4594,7 +4673,8 @@ function peCompile(){
       if(type!=='refill'){ c.countKey=`${id}_n${p}`; if(mine) D[c.countKey]=clampInt(s.n||1,1,9); }
       if(s.type==='src'){ c.noReturn=true; c.dropEmpty=true; }        // 人員投滿框，AGV 拿走就好
       else if(s.type==='sink'){ c.dropEmpty=true; }                    // 放滿框即完成，空框人員收走
-      else if(s.empty==='self'){ c.selfReturn=true; c.selfRetKey=`${id}_r${p}`; if(mine) D[c.selfRetKey]=30; }
+      else if(s.empty==='self'){ c.selfReturn=true; c.selfRetKey=`${id}_r${p}`;
+        if(mine) D[c.selfRetKey]=peSelfRetSec(own[i]!==i?own[i]:i); }
       else if(s.empty==='drop'){ c.dropEmpty=true; if(type==='refill') c.noReturn=true; }
       // 起始收空框（畫面上也能點那一格切換）；同一台的兩個步驟各有自己的出料端，所以用 i 不用 p
       if(type==='transfer' || (type==='refill' && !c.noReturn)){ c.seedKey=`${id}_s${i}`; D[c.seedKey]=(s.seed==null?1:(s.seed?1:0)); }
@@ -4617,34 +4697,36 @@ function peCompile(){
   const srcPaths=drawn||peState.srcPaths||null;
   const pathOf=(a,b)=>{
     if(!srcPaths || colOxi[a]==null || colOxi[b]==null) return null;
-    const x=Math.min(colOxi[a],colOxi[b]), y=Math.max(colOxi[a],colOxi[b]);
-    const rec=srcPaths[`${x}_${y}`];
-    return rec ? (colOxi[a]<=colOxi[b] ? rec : {p:rec.p.slice().reverse(), len:rec.len}) : null;
+    return planPathAt(srcPaths, colOxi[a], colOxi[b]);
   };
+  const colStn=x=>S[own.findIndex((o,j)=>col[j]===x)];
+  const boxOfCol=x=>{ const o=colStn(x), d=peDefSize(o.type);
+    return {x:o.x, y:o.y, w:o.w||d[0], h:o.h||d[1], face:o.face||''}; };
+  // 一趟搬運的距離＝來源「出口側」到目的「入口側」，方向不同距離就不同 → 兩個方向各一格參數
   const paths={};
-  // 每一條任務都給一格可調的走行時間，預設＝走道長度（沒有走道資料就用兩點直線）× 秒/像素
   const routeParams=[], seen={};
   for(const t of peState.tasks){
-    const a=Math.min(col[t.f],col[t.t]), b=Math.max(col[t.f],col[t.t]);
+    const a=col[t.f], b=col[t.t];
     if(a===b || !S[t.f] || !S[t.t]) continue;             // 同一台設備內部＝站內回空框，另有參數
     const k=`${id}_${a}_${b}`; if(seen[k]) continue; seen[k]=1;
     const rec=pathOf(a,b); if(rec) paths[`${a}_${b}`]=rec;
-    const oa=S[own.findIndex((o,j)=>col[j]===a)], ob=S[own.findIndex((o,j)=>col[j]===b)];
-    const dza=peDefSize(oa.type), dzb=peDefSize(ob.type);
-    const da=peDockAt({x:oa.x,y:oa.y,w:oa.w||dza[0],h:oa.h||dza[1],face:oa.face||''});
-    const db=peDockAt({x:ob.x,y:ob.y,w:ob.w||dzb[0],h:ob.h||dzb[1],face:ob.face||''});
+    const oa=colStn(a), ob=colStn(b);
+    const ba=boxOfCol(a), bb=boxOfCol(b);
+    const da=peDockAt({...ba, face:PLAN_OPP[ba.face]||ba.face});     // 來源的出口側
+    const db=peDockAt(bb);                                           // 目的的入口側
     const dist=rec ? rec.len*SC : Math.hypot(da[0]-db[0], da[1]-db[1]);
     const calc=Math.max(1, Math.round(dist*peState.secPerUnit));
     const note = peState.mPerUnit>0
-      ? `${(dist*peState.mPerUnit).toFixed(1)} 公尺 ÷ ${peState.agvSpeed||'?'} 公尺/分`
-      : `圖上 ${Math.round(dist)} 像素 × ${peState.secPerUnit} 秒/像素`;
-    routeParams.push({key:k, label:`${oa.name} ↔ ${ob.name}`,
-      seg: b===a+1?('s'+a):`d${a}_${b}`, pair:[a,b], calcSec:calc, calcNote:note});
+      ? `出口→入口 ${(dist*peState.mPerUnit).toFixed(1)} 公尺 ÷ ${peState.agvSpeed||'?'} 公尺/分`
+      : `出口→入口 ${Math.round(dist)} 像素 × ${peState.secPerUnit} 秒/像素`;
+    const lo=Math.min(a,b), hi=Math.max(a,b);
+    routeParams.push({key:k, label:`${oa.name} → ${ob.name}`,
+      seg: hi===lo+1?('s'+lo):`d${lo}_${hi}`, pair:[a,b], calcSec:calc, calcNote:note});
     D[k]=calc;
   }
-  // AGV 空車調度也會走到沒開參數的組合 → 整份走道表都留著
-  if(srcPaths) for(let a=0;a<nCol;a++) for(let b=a+1;b<nCol;b++){
-    if(paths[`${a}_${b}`]) continue; const rec=pathOf(a,b); if(rec) paths[`${a}_${b}`]=rec;
+  // AGV 空車調度也會走到沒開參數的組合 → 整份走道表都留著（兩個方向都要）
+  if(srcPaths) for(let a=0;a<nCol;a++) for(let b=0;b<nCol;b++){
+    if(a===b || paths[`${a}_${b}`]) continue; const rec=pathOf(a,b); if(rec) paths[`${a}_${b}`]=rec;
   }
   const W=peState.bgW||1200, H=peState.bgH||700;
   const sink=S.map((s,i)=>i).filter(i=>S[i].type==='changer').pop();
@@ -4657,7 +4739,7 @@ function peCompile(){
     // 存原始編輯狀態供再編輯；底圖不重複存（從 layout.bg 借回來），否則 localStorage 很快就爆
     planSrc: JSON.parse(JSON.stringify({...peState, editId:null, bg:null})),
     layout:{ type:'plan', xiCount:nCol, secPerUnit:peState.secPerUnit, planScale:SC,
-      mPerUnit:peState.mPerUnit||0, agvSpeed:peState.agvSpeed||0,
+      mPerUnit:peState.mPerUnit||0, agvSpeed:peState.agvSpeed||0, calSeg:peState.calSeg||null,
       pos:Array.from({length:nCol},(_,x)=>{ const i=own.findIndex((o,j)=>col[j]===x); return [S[i].x,S[i].y]; }),
       size:Array.from({length:nCol},(_,x)=>{ const i=own.findIndex((o,j)=>col[j]===x), d=peDefSize(S[i].type);
         return [S[i].w||d[0], S[i].h||d[1]]; }),
