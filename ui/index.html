@@ -1129,26 +1129,70 @@ function midHasSpace(buf, mode){
   if(mode==='avail') return avail < buf.buf;
   return avail + m.reduce((n,o)=>n+o.pendingFrames.length,0) < buf.buf; // 'pending'（預設）
 }
-// 這一隊的任務全部都只從「i 這一台機台」取料嗎？
-// 只有這種車才值得先繞到取料側等：反正它下一趟一定是在這裡取，走這段不會白走。
-// 如果這一隊還要去別站取料，先就位反而是把時間丟掉（下一趟往別處走，這段白繞）。
-// 同一台設備的第 2 個製程步驟算同一個位置
-function groupSrcOnly(g, i){
-  if(!g._srcSet){
-    const S=new Set();
-    for(const t of (g.tasks||[])) for(const fi of (t.f||[])) S.add(fi);
-    for(const l of (g.legs||[])){
-      if(l.mid!=null){
-        if(l.half!=='B') for(const si of l.src) S.add(si);
-        if(l.half!=='A') S.add(l.mid);
-        if(l.half!=='B') for(const di of l.dst) S.add(di);
-      } else { for(const si of l.src) S.add(si); for(const di of l.dst) S.add(di); }
+// 這一隊會去哪些站取料，各自要拿什麼（滿框 / 空框）。跟「現在好了沒」無關
+function groupSrcCands(g){
+  if(g._srcCands) return g._srcCands;
+  const M=new Map(), add=(si,c)=>{ if(si!=null) M.set(si+'/'+c,{si,c}); };
+  for(const t of (g.tasks||[])) for(const fi of (t.f||[])) add(fi, t.c||'full');
+  for(const l of (g.legs||[])){
+    if(l.mid!=null){
+      if(l.half!=='B') for(const si of l.src) add(si,'full');
+      if(l.half!=='A') add(l.mid,'full');
+      if(l.half!=='B') for(const di of l.dst) add(di,'empty');
+    } else {
+      for(const si of l.src) add(si,'full');
+      for(const di of l.dst) add(di,'empty');
     }
-    for(const si of (g.selfRet||[])) S.add(si);
-    g._srcSet=[...S];
   }
-  // 一定要是「同一台實體機台」：並排兩台的話車不知道下一趟會去哪一台，先就位反而白走
-  return g._srcSet.length>0 && g._srcSet.every(si=>stnSamePlace(si,i));
+  for(const si of (g.selfRet||[])) add(si,'empty');
+  return (g._srcCands=[...M.values()]);
+}
+// 這一站還要多久才會有東西可以取（0＝現在就有、Infinity＝看不出來）。
+// 只看機台自己的計時器，不往上游推，估得保守但不會亂跑
+function stnSrcETA(si, c){
+  const s=abfSt[si]; if(!s) return Infinity;
+  if(c==='empty'){
+    if(s.selfReturn ? selfRetReady(s) : dstRetAvail(s)) return 0;
+    if(s.in_ret) return s.in_ret_hold||0;                 // 已經退出來了，等保護期
+    if(s.machineActive) return s.machineTimer + IN_RET_HOLD;
+    return Infinity;
+  }
+  if(s.buf){
+    if(s.fullAvail > s.fullReserved) return 0;            // 烤好了
+    if(s.pendingFrames && s.pendingFrames.length)
+      return Math.max(0, Math.min(...s.pendingFrames));   // 最快出爐的那一框
+    return Infinity;
+  }
+  if(srcOutFull(s)) return 0;
+  if(s.mtype==='refill') return s.machineActive ? s.machineTimer : Infinity;
+  if(s.out_full) return s.out_full_hold||0;               // 已經出來了，等保護期
+  if(s.machineActive) return s.machineTimer + OUT_FULL_HOLD;
+  return Infinity;
+}
+// 先出發：現在沒事做，但某個取料點快好了 → 比「走過去要多久」跟「還要多久才好」，
+// 接得上就先開過去等。走到一半有任務進來會被叫走（見 stepABFAgv）
+const PRE_MAX_WAIT = 120;   // 走到之後最多願意再空等幾秒；再久就先待在原地
+function planAhead(agv){
+  const g=LC.groups[agv.grp-1];
+  let best=null;
+  for(const {si,c} of groupSrcCands(g)){
+    if(stnSamePlace(si,agv.pos) && agv.side==='out') continue;      // 已經站在取料口了
+    // 同組已經有人在路上或正要去，就別跟著擠
+    if(abfAGVs.some(o=>o!==agv && o.grp===agv.grp &&
+        (o.preTo===si || (o.phase==='toPickup' && o.toPos===si)))) continue;
+    const eta=stnSrcETA(si,c);
+    if(!isFinite(eta) || eta<=0) continue;                          // 現在就有的交給 tryStartTask
+    const trav=legSec(agv.pos, si);
+    if(!(trav>0)) continue;
+    const slack=eta-trav;                                           // 走到之後還要空等多久
+    if(slack>PRE_MAX_WAIT) continue;                                // 還太早，先別動
+    if(!best || slack<best.slack) best={si, trav, slack};
+  }
+  if(!best) return false;
+  agv.preTo=best.si; agv.fromPt=null;
+  agv.fromPos=agv.pos; agv.toPos=best.si;
+  agv.legPos=0; agv.legTime=Math.max(1,best.trav); agv.phase='repos'; agv.enroute=1;
+  return true;
 }
 function genGroupTasks(g){
   const T=(g.tasks?genFreeTasks(g):g.legs.flatMap(genLegTasks));
@@ -1655,11 +1699,12 @@ function tryStartTask(agv){
     );
     if(closerExists) continue;
     if(tryPickupABF(task.f, task.c)){
-      agv._repos=0;
+      agv.preTo=null;
       agv.cargo=task.c; agv.destPos=task.t;
       reserveDestination(task.t, task.c);
-      // 已經站在取料那一側才是零距離；停在放料側就得繞過機台，不能瞬移
-      if(stnSamePlace(agv.pos,task.f) && (agv.side==='out' || !stnTwoSided(task.f))){
+      // 已經站在取料那一側才是零距離；停在放料側就得繞過機台，不能瞬移。
+      // 先開過去的車還在半路（enroute），agv.pos 只是出發點，不能當作人在那裡
+      if(!agv.enroute && stnSamePlace(agv.pos,task.f) && (agv.side==='out' || !stnTwoSided(task.f))){
         agv.pos=task.f;
         doActualPickup(task.f,task.c);
         const _pt=getPickTime(task.f);
@@ -1674,6 +1719,11 @@ function tryStartTask(agv){
     }
   }
   return agv.phase!=='idle';
+}
+// 折線總長
+function routeLen(pts){
+  let d=0; for(let i=0;i+1<pts.length;i++) d+=Math.hypot(pts[i+1][0]-pts[i][0], pts[i+1][1]-pts[i][1]);
+  return d;
 }
 // AGV 現在畫在哪（純算，不碰 DOM）：先就位走到一半被叫走時要從這裡接著走
 function agvPointNow(agv){
@@ -1701,7 +1751,7 @@ function stepABFAgv(agv, dt){
   // 放料等待（AGV 已到站，等放料時間）
   if(agv.phase==='dropping'){
     agv.dropWait-=dt;
-    if(agv.dropWait<=0){ doDropoffABF(agv.pos,agv.cargo); agv.cargo=null; agv.phase='idle'; agv._repos=0; }
+    if(agv.dropWait<=0){ doDropoffABF(agv.pos,agv.cargo); agv.cargo=null; agv.phase='idle'; agv.preTo=null; }
     return;
   }
 
@@ -1709,27 +1759,27 @@ function stepABFAgv(agv, dt){
   if(agv.phase==='idle' || agv.phase==='repos'){
     const wasRepos=(agv.phase==='repos');
     const here=wasRepos?agvPointNow(agv):null;      // 記住現在走到哪，免得倒回去
+    const preTo=agv.preTo, remain=wasRepos?agv.legTime*(1-agv.legPos):0;
     agv.phase='idle';
     if(tryStartTask(agv)){
-      if(wasRepos && here && (agv.phase==='toPickup')) agv.fromPt=here;   // 從當下位置接著走
+      if(wasRepos && here && agv.phase==='toPickup'){
+        agv.fromPt=here;                            // 從當下位置接著走，不要倒回出發點
+        // 車已經在半路上，路段參數（欄對欄）不適用了：照剩下這條折線的實際長度重算時間，
+        // 不然會出現「1 秒走完 700 像素」這種飛車
+        const pts=planRoute(agv.fromPos, agv.toPos, here, 'out');
+        const sec=pts ? Math.round(routeLen(pts)*(LC.layout.secPerUnit||0.1)) : 0;
+        agv.legTime=Math.max(1, sec || Math.round(remain));
+      }
+      agv.enroute=0;
       return;
     }
     if(wasRepos){                                   // 沒事做就繼續走完剩下的
       agv.phase='repos'; agv.legPos += dt/agv.legTime;
-      if(agv.legPos>=1){ agv.legPos=1; agv.pos=agv.toPos; agv.fromPt=null; agv.side='out'; agv.phase='idle'; }
+      if(agv.legPos>=1){ agv.legPos=1; agv.pos=agv.toPos; agv.fromPt=null;
+                         agv.side='out'; agv.phase='idle'; agv.preTo=null; agv.enroute=0; }
       return;
     }
-    // 沒事做：這一隊如果會從腳下這台機台取料，就趁現在繞到取料側等。
-    // 料一好就直接拿得到，不用再花時間繞過去
-    if(agv.side==='in' && !agv._repos && stnTwoSided(agv.pos)
-       && groupSrcOnly(LC.groups[agv.grp-1], agv.pos)){
-      const sec=legSec(agv.pos, agv.pos);
-      if(sec>1){
-        agv._repos=1;                       // 走到定位就不再重來，免得來回擺盪
-        agv.fromPos=agv.pos; agv.toPos=agv.pos; agv.fromPt=null;
-        agv.legPos=0; agv.legTime=sec; agv.phase='repos';
-      }
-    }
+    planAhead(agv);          // 沒事做 → 看看哪個取料點快好了，接得上就先開過去等
     return;
   }
 
@@ -1746,7 +1796,7 @@ function stepABFAgv(agv, dt){
       agv.side='in';                         // 到放料側了
       const _dt=getDropTime(agv.pos);
       if(_dt>0){ agv.dropWait=_dt; agv.phase='dropping'; }
-      else { doDropoffABF(agv.pos,agv.cargo); agv.cargo=null; agv.phase='idle'; agv._repos=0; }
+      else { doDropoffABF(agv.pos,agv.cargo); agv.cargo=null; agv.phase='idle'; agv.preTo=null; }
     }
   }
 }
@@ -2289,7 +2339,18 @@ function planRoute(fi,ti,fs,ts){
   const pa=Array.isArray(fs) ? fs : (planDock(a,0,fs||'out')||[a.x,a.y]);
   const pb=planDock(b,0,ts||'in')||[b.x,b.y];
   if(!rec) return [pa,pb];
-  return [pa, ...rec.p.map(p=>[p[0]*SC,p[1]*SC]), pb];   // 兩端接回機台的出口／入口
+  let pts=rec.p.map(p=>[p[0]*SC,p[1]*SC]);
+  if(Array.isArray(fs)){
+    // 起點是半路上的某個點（先開過去的車被叫走）→ 已經走過的轉角要砍掉，
+    // 不然車會先倒回路線起點，看起來就是瞬移
+    let bi=0, bd=Infinity;
+    for(let k=0;k<pts.length;k++){
+      const d=Math.hypot(pts[k][0]-pa[0], pts[k][1]-pa[1]);
+      if(d<bd){ bd=d; bi=k; }
+    }
+    pts=pts.slice(bi+1);
+  }
+  return [pa, ...pts, pb];                 // 兩端接回機台的出口／入口
 }
 // 折線上依比例 t(0~1) 取點
 function alongRoute(pts,t){
@@ -2835,7 +2896,7 @@ function agvNowText(a){
   if(a.stag>0) return '⏸ 尚未上線';
   switch(a.phase){
     case 'toPickup':   return `🚚 前往取料 → ${nm(a.toPos)}`;
-    case 'repos':      return `↪ 先到取料側等 ${nm(a.pos)}`;
+    case 'repos':      return `↪ 先開過去等 → ${nm(a.toPos)}`;
     case 'picking':    return `⬆ 取料中 ${nm(a.pos)}（${Math.ceil(a.pickWait)}s）`;
     case 'delivering': return `${a.cargo==='empty'?'○ 載空框':'● 載滿框'} → ${nm(a.destPos)}`;
     case 'dropping':   return `⬇ 放料中 ${nm(a.pos)}（${Math.ceil(a.dropWait)}s）`;

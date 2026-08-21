@@ -9,7 +9,7 @@ const externals=[...html.matchAll(/<script src="([^"]+)"><\/script>/g)]
   .map(p=>fs.readFileSync(p,'utf8')).join('\n');
 const src=externals+'\n'+[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n')
   + ';globalThis.__x={BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLineConfig,'
-  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,planCardGeom,planDockOf,routeCalc,peSetSpeed,selfRetCalc,legSec,stnSamePlace,stnTwoSided,groupSrcOnly,buildSimState,setSim:(lc,b)=>{LC=lc;abfSt=b.st;abfAGVs=b.agvs;simT=0;abfPcs=0;abfOut=[];},agvs:()=>abfAGVs,stepAll:(n)=>{for(let k=0;k<n;k++){updateABFMachines(2);for(const a of abfAGVs)stepABFAgv(a,2);simT+=2;}return abfPcs;},peSetMpp,peSetSize,pePx2U,peSizeUnit,getPeState:()=>peState,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
+  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,planCardGeom,planDockOf,routeCalc,peSetSpeed,selfRetCalc,legSec,stnSamePlace,stnTwoSided,groupSrcCands,stnSrcETA,planAhead,buildSimState,setSim:(lc,b)=>{LC=lc;abfSt=b.st;abfAGVs=b.agvs;simT=0;abfPcs=0;abfOut=[];},agvs:()=>abfAGVs,pcs:()=>abfPcs,stepAll:(n)=>{for(let k=0;k<n;k++){updateABFMachines(2);for(const a of abfAGVs)stepABFAgv(a,2);simT+=2;}return abfPcs;},peSetMpp,peSetSize,pePx2U,peSizeUnit,getPeState:()=>peState,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
 const stub=new Proxy(function(){},{
   get:(t,k)=> k===Symbol.toPrimitive?(()=>0) : k===Symbol.toStringTag?'stub' : stub,
   set:()=>true, apply:()=>stub, construct:()=>stub});
@@ -336,40 +336,44 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
     +`（以前都是 0）；8000s 出料 ${pcs} 片`);
 }
 
-// 排程：專門服務一台機台的車，等料時先站到取料口；服務多台的車不會亂跑
+// 排程：沒事做的車會先算「哪個取料點快好了」，接得上就先開過去等
 {
-  const {peCompile,setPeState,buildLineConfig,buildSimState,setSim,stepAll,groupSrcOnly}=ctx.__x;
-  setPeState({secPerUnit:0.1, planScale:1, name:'先就位', batch:1, color:'#2e8b57', pick:10, drop:10,
-    teams:[{name:'G1',n:3},{name:'G2',n:1}],
-    tasks:[{f:0,t:1,c:'full',g:0},{f:1,t:2,c:'full',g:0},{f:1,t:1,c:'empty',g:1}],
-    stns:[{name:'A',type:'src',      val:30, n:1,empty:'',    x:200, y:900, w:120,h:200, face:'S'},
-          {name:'B',type:'transfer', val:30, n:1,empty:'self',x:800, y:420, w:140,h:800, face:'S'},
-          {name:'C',type:'sink',     val:30, n:2,empty:'',    x:1400,y:900, w:120,h:200, face:'S'}],
+  const {peCompile,setPeState,buildLineConfig,buildSimState,setSim,stepAll,agvs,
+         groupSrcCands,stnSrcETA,planAhead}=ctx.__x;
+  setPeState({secPerUnit:0.1, planScale:1, name:'預先出發', batch:1, color:'#2e8b57', pick:10, drop:10,
+    teams:[{name:'G1',n:1}],
+    tasks:[{f:0,t:1,c:'full',g:0},{f:1,t:2,c:'full',g:0},{f:1,t:1,c:'empty',g:0}],
+    stns:[{name:'A',type:'src',      val:300,n:1,empty:'',    x:200, y:900, w:120,h:200, face:'S'},
+          {name:'B',type:'transfer', val:300,n:1,empty:'self',x:800, y:600, w:140,h:400, face:'S'},
+          {name:'C',type:'sink',     val:60, n:1,empty:'',    x:1400,y:900, w:120,h:200, face:'S'}],
     aisles:[[[100,1100],[1500,1100]]]});
   const bp=peCompile();
   ctx.__x.applyDefaults(bp.defaults);
   const lc=buildLineConfig(bp), b=buildSimState(lc);
   setSim(lc, b);
-  const mach=b.st.findIndex(s=>s.selfRetKey);
-  const g2=lc.groups[1], g1=lc.groups[0];
-  assert.ok(groupSrcOnly(g2, mach), 'G2 只服務一台機台，應該要能先就位');
-  assert.ok(!groupSrcOnly(g1, mach), 'G1 跟兩站都有關，不該先就位');
-  // 跑一段，G2 那台車一定會用到「先到取料側等」
-  let saw=0, out=false;
-  for(let k=0;k<3000;k++){
+  const cands=groupSrcCands(lc.groups[0]);
+  assert.ok(cands.length>=2, '取料點清單沒算出來');
+  assert.ok(cands.some(x=>x.c==='full') && cands.some(x=>x.c==='empty'), '滿框/空框沒分開');
+  // A 站正在生產：ETA 應該就是機台剩餘時間，不是 0 也不是 Infinity
+  stepAll(30);
+  const a0=b.st.findIndex(s=>s.mtype==='refill');
+  const eta=stnSrcETA(a0,'full');
+  assert.ok(isFinite(eta) && eta>0, `生產中的站 ETA 算不出來：${eta}`);
+  assert.ok(Math.abs(eta-b.st[a0].machineTimer)<1e-6, 'ETA 跟機台計時器對不起來');
+  // 跑一段，車一定會用到「先開過去等」，而且會停在取料側
+  let saw=0, cross=0, ready=0;
+  for(let k=0;k<2000;k++){
     stepAll(1);
-    for(const a of ctx.__x.agvs()) if(a.phase==='repos') saw++;
-    for(const a of ctx.__x.agvs()) if(a.grp===2 && a.phase==='idle' && a.side==='out') out=true;
+    for(const a of agvs()){
+      if(a.phase==='repos'){ saw++; if(a.toPos!==a.fromPos) cross++; }
+      if(a.phase==='idle' && a.side==='out') ready++;                 // 已經站在取料口等
+    }
   }
-  assert.ok(saw>0, '專路車從來沒先就位過');
-  assert.ok(out, '先就位後沒停在取料側等');
-  // 內建 PLS 的每一隊都跨站，全部都不該先就位
-  const plc=buildLineConfig(BLUEPRINTS.pls), pb=buildSimState(plc);
-  setSim(plc, pb);
-  const any=plc.groups.some(g=>pb.st.some((s,i)=>groupSrcOnly(g,i)));
-  assert.strictEqual(any, false, 'PLS 有隊伍被誤判成只服務一台');
-  console.log(`✓ 先就位     專路車（只服務一台）等料時先站到取料口；`
-    +`跨站的隊伍（含 PLS 六隊）一律不觸發`);
+  assert.ok(saw>0, '從來沒先開過去等');
+  assert.ok(cross>0, '只會在原地繞，沒有真的先開到別站');
+  assert.ok(ctx.__x.pcs()>0, '加了預先出發後跑不出料');
+  console.log(`✓ 預先出發   沒事做的車會看哪個取料點快好了（ETA=機台剩餘時間）`
+    +`，接得上就先開過去停在取料口等`);
 }
 
 // 人員投料站永遠不能被選為空框回程的目的地
