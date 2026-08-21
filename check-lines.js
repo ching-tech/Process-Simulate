@@ -9,7 +9,7 @@ const externals=[...html.matchAll(/<script src="([^"]+)"><\/script>/g)]
   .map(p=>fs.readFileSync(p,'utf8')).join('\n');
 const src=externals+'\n'+[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n')
   + ';globalThis.__x={BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLineConfig,'
-  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,planCardGeom,planDockOf,routeCalc,peSetSpeed,selfRetCalc,peSetMpp,peSetSize,pePx2U,peSizeUnit,getPeState:()=>peState,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
+  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,planCardGeom,planDockOf,routeCalc,peSetSpeed,selfRetCalc,legSec,stnSamePlace,stnTwoSided,buildSimState,setSim:(lc,b)=>{LC=lc;abfSt=b.st;abfAGVs=b.agvs;simT=0;abfPcs=0;abfOut=[];},stepAll:(n)=>{for(let k=0;k<n;k++){updateABFMachines(2);for(const a of abfAGVs)stepABFAgv(a,2);simT+=2;}return abfPcs;},peSetMpp,peSetSize,pePx2U,peSizeUnit,getPeState:()=>peState,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
 const stub=new Proxy(function(){},{
   get:(t,k)=> k===Symbol.toPrimitive?(()=>0) : k===Symbol.toStringTag?'stub' : stub,
   set:()=>true, apply:()=>stub, construct:()=>stub});
@@ -301,6 +301,39 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
   assert.strictEqual(routeCalc(cp, chk).sec, cp.defaults[rp.key], '烤箱出發那段現算對不上（oneDoor 沒帶到）');
   console.log(`✓ 烤箱單門   進出同一個門：A→O ${PA['0_1'].len} / O→A ${PA['1_0'].len} / O→C ${PA['1_2'].len}`
     +`（差別只來自對向那一台）`);
+}
+
+// AGV 不能在機台的兩側之間瞬移：站在放料側就得先繞到取料側，那一段要有時間
+{
+  const {planSrcFromBlueprint,peCompile,setPeState,buildLineConfig,buildSimState,setSim,stepAll,
+         legSec,stnSamePlace,stnTwoSided,applyDefaults}=ctx.__x;
+  const src=planSrcFromBlueprint(BLUEPRINTS.pls);
+  setPeState(src);
+  const bp=peCompile();
+  applyDefaults(bp.defaults);
+  const lc=buildLineConfig(bp), b=buildSimState(lc);
+  setSim(lc, b);
+  const self=b.st.findIndex(s=>s.selfRetKey && !s.alias);
+  assert.ok(self>=0, '找不到站內回空框的站');
+  assert.ok(stnTwoSided(self), '有佔地的加工機應該分得出兩側');
+  assert.ok(legSec(self,self)>1, `站內回空框走一趟只要 ${legSec(self,self)}s`);
+  // 同一台設備的第 2 個製程步驟：站別索引不同、圖上同一個位置
+  const al=b.st.findIndex(s=>s.alias);
+  if(al>=0){
+    const own=b.st.findIndex((s,k)=>k!==al && !s.alias && s.xi===b.st[al].xi && (s.sub||0)===(b.st[al].sub||0));
+    assert.ok(own>=0, '找不到分身對應的本尊');
+    assert.ok(stnSamePlace(al,own), '分身跟本尊沒被認成同一台');
+    assert.ok(legSec(al,own)>1, `分身↔本尊只要 ${legSec(al,own)}s，會瞬移`);
+  }
+  // 烤箱只有一個門：不分兩側，維持零距離
+  const ov=b.st.findIndex(s=>s.buf);
+  assert.strictEqual(stnTwoSided(ov), false, '烤箱不應該分兩側');
+  // 照樣跑得出料
+  const pcs=stepAll(4000);
+  assert.ok(pcs>0, '加了繞路時間後跑不出料');
+  console.log(`✓ 不瞬移     站內回空框 ${legSec(self,self)}s、`
+    +`分身↔本尊 ${al>=0?legSec(al,b.st.findIndex((s,k)=>k!==al&&!s.alias&&s.xi===b.st[al].xi&&(s.sub||0)===(b.st[al].sub||0)))+'s':'—'}`
+    +`（以前都是 0）；8000s 出料 ${pcs} 片`);
 }
 
 // 人員投料站永遠不能被選為空框回程的目的地

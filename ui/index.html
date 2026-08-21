@@ -1324,6 +1324,7 @@ function buildSimState(lc){
   const agvs=lc.agvInits.map(d=>({
     id:d.id, pos:d.pos, grp:d.grp, fromPos:d.pos, toPos:-1, destPos:-1,
     legPos:0, legTime:1, phase:'idle', cargo:null, stag:d.stag, pickWait:0, dropWait:0,
+    side:'in',                       // 站在機台的入料側還是出料側；取料在出料側、放料在入料側
     tMove:0, tHandle:0, tIdle:0, tStag:0
   }));
   return {st, agvs};
@@ -1578,10 +1579,36 @@ function doDropoffABF(si, cargo){
 // ══════════════════════════════════════════════════════════════
 function startDelivery(agv){
   agv.fromPos=agv.pos; agv.toPos=agv.destPos;
-  agv.legPos=0; agv.legTime=Math.max(1,tABF(agv.pos,agv.destPos));
+  agv.legPos=0; agv.legTime=Math.max(1,legSec(agv.pos,agv.destPos));
   agv.phase='delivering';
 }
 
+// 圖上是不是同一台實體機台（同一欄、同一台）。同一台設備的第 2 個製程步驟
+// 站別索引不同，但畫在同一個位置
+function stnSamePlace(i,j){
+  const a=abfSt[i], b=abfSt[j];
+  return !!a && !!b && a.xi===b.xi && (a.sub||0)===(b.sub||0);
+}
+// 一段路要走幾秒。tABF 是「欄對欄」的走行時間，同一欄之間會回 0；
+// 但圖上同一欄可能是「同一台的另一側」或「並排的第 2 台」，都不是零距離。
+// 以前那些情形 legTime 直接變 1 秒，畫面上就是瞬移
+// 這一站在圖上分得出「取料側／放料側」嗎？沒量佔地的線、還有只有一個門的
+// 烤箱都算不出來，那就維持原本的「同一站＝零距離」
+function stnTwoSided(i){
+  const s=abfSt[i]; if(!s) return false;
+  const b=(typeof planBox==='function')?planBox(s):null;
+  return !!(b && b.face && !b.oneDoor);
+}
+function legSec(i,j){
+  const t=tABF(i,j);
+  if(t>0) return t;
+  const a=abfSt[i], b=abfSt[j];
+  if(!a||!b) return t;
+  const pa=planDock(a,0,'out'), pb=planDock(b,0,'in');   // 從出料側走到對方的入料側
+  if(!pa||!pb) return t;
+  const d=Math.hypot(pa[0]-pb[0], pa[1]-pb[1]);
+  return d>0 ? Math.max(1, Math.round(d*(LC.layout.secPerUnit||0.1))) : t;
+}
 function stepABFAgv(agv, dt){
   // 稼動統計累計（依進入此步前的狀態分類）
   if(agv.stag>0) agv.tStag+=dt;
@@ -1630,14 +1657,16 @@ function stepABFAgv(agv, dt){
       if(tryPickupABF(task.f, task.c)){
         agv.cargo=task.c; agv.destPos=task.t;
         reserveDestination(task.t, task.c);
-        if(agv.pos===task.f){
+        // 已經站在取料那一側才是零距離；停在放料側就得繞過機台，不能瞬移
+        if(stnSamePlace(agv.pos,task.f) && (agv.side==='out' || !stnTwoSided(task.f))){
+          agv.pos=task.f;
           doActualPickup(task.f,task.c);
           const _pt=getPickTime(task.f);
           if(_pt>0){ agv.pickWait=_pt; agv.phase='picking'; }
           else startDelivery(agv);
         } else {
           agv.fromPos=agv.pos; agv.toPos=task.f;
-          agv.legPos=0; agv.legTime=Math.max(1,tABF(agv.pos,task.f));
+          agv.legPos=0; agv.legTime=Math.max(1,legSec(agv.pos,task.f));
           agv.phase='toPickup';
         }
         break;
@@ -1650,11 +1679,13 @@ function stepABFAgv(agv, dt){
   if(agv.legPos >= 1){
     agv.legPos=1; agv.pos=agv.toPos;
     if(agv.phase==='toPickup'){
+      agv.side='out';                        // 到取料側了
       doActualPickup(agv.pos,agv.cargo);
       const _pt=getPickTime(agv.pos);
       if(_pt>0){ agv.pickWait=_pt; agv.phase='picking'; }
       else startDelivery(agv);
     } else { // delivering
+      agv.side='in';                         // 到放料側了
       const _dt=getDropTime(agv.pos);
       if(_dt>0){ agv.dropWait=_dt; agv.phase='dropping'; }
       else { doDropoffABF(agv.pos,agv.cargo); agv.cargo=null; agv.phase='idle'; }
@@ -2989,7 +3020,8 @@ function updateABFAgvPos(a){
       const parked=abfAGVs.filter(o=>o.pos===a.pos &&
         (o.phase==='idle'||o.phase==='picking'||o.phase==='dropping'||o.toPos<0));
       const k=Math.max(0,parked.indexOf(a)), n=parked.length||1, off=(k-(n-1)/2);
-      const side=(a.phase==='picking'||a.phase==='toPickup')?'out':'in';
+      const side=(a.phase==='picking'||a.phase==='toPickup')?'out'
+               : a.phase==='dropping' ? 'in' : (a.side||'in');
       const d=planDock(s,18,side);
       if(d){
         let f=(LC.layout.face&&LC.layout.face[s.xi])||'';
