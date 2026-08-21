@@ -476,7 +476,8 @@ html[data-theme=dark] #clk{color:var(--yellow)}
       <label>名稱</label><input id="pe-name" placeholder="例如：H05 5F PLS" style="width:150px">
       <label>每框片數</label><input id="pe-batch" type="number" min="1" value="1" style="width:52px">
       <label>顏色</label><input id="pe-color" type="color" value="#2e8b57" style="width:36px;padding:0;height:26px">
-      <label>底圖</label><input id="pe-bg" type="file" accept="image/*" onchange="peLoadBg(event)" style="width:170px;font-size:11px">
+      <label>底圖</label><input id="pe-bg" type="file" accept="image/*,application/pdf,.pdf" onchange="peLoadBg(event)" style="width:186px;font-size:11px" title="圖檔或 PDF 平面圖都可以；PDF 會轉成圖片">
+      <span id="pe-bg-pg" style="display:none"><label>PDF 第</label><input id="pe-bg-page" type="number" min="1" value="1" style="width:46px" onchange="pePdfPage(+this.value)"><label id="pe-bg-pgn" style="margin-left:2px"></label></span>
       <label title="圖上 1 像素等於幾公尺。用「📏 量距離」量一段已知長度就會自動算出來，之後機台尺寸都能用公尺填">公尺/像素</label><input id="pe-mpp" type="number" min="0" step="0.001" placeholder="未校正" style="width:64px" onchange="peSetMpp(+this.value)">
       <label title="圖上 1 像素等於幾秒的走行時間">秒/像素</label><input id="pe-spu" type="number" min="0.001" step="0.01" value="0.1" style="width:56px" onchange="peSync()">
       <label title="用「📏 量距離」量一段已知長度來換算">實際距離（公尺）</label><input id="pe-cal-m" type="number" min="0" step="0.5" placeholder="公尺" style="width:56px" aria-label="實際距離，單位公尺">
@@ -4081,6 +4082,7 @@ function openPlanEd(editId){
   $('pe-mpp').value=peState.mPerUnit||'';
   $('pe-cal-v').value=peState.agvSpeed||60;
   peUndo=[]; peLast=null; peMode='move'; peLink=null; peDraft=null; peMeasure=null;
+  pePdfClose();
   peRender(); setPeMsg('');
   peSaved=peLast;                       // 以剛載入的狀態當「沒改過」的基準
   const el=$('plan-editor'); el.classList.add('show'); trapFocus(el.querySelector('.wz'));
@@ -4129,22 +4131,86 @@ function peShrinkBg(im, dataUrl){
 }
 function peLoadBg(e){
   const f=e.target.files[0]; if(!f) return;
+  const isPdf=/pdf/i.test(f.type||'') || /\.pdf$/i.test(f.name||'');
   const r=new FileReader();
-  r.onload=ev=>{
-    const im=new Image();
-    im.onload=()=>{
-      peSync();
-      const before=ev.target.result.length, g=peShrinkBg(im, ev.target.result);
-      peState.bg=g.url; peState.bgW=g.w; peState.bgH=g.h; peRender();
-      const kb=n=>Math.round(n/1024)+'KB';
-      setPeMsg(g.cut
-        ? `底圖 ${im.width}×${im.height} → 縮成 ${g.w}×${g.h}（${kb(before)} → ${kb(g.url.length)}），點兩下圖面新增機台`
-        : `底圖 ${g.w}×${g.h}px 已載入（${kb(g.url.length)}），點兩下圖面新增機台`, 'ok');
-    };
-    im.onerror=()=>setPeMsg('圖檔讀不出來','err');
-    im.src=ev.target.result;
-  };
+  r.onload=ev=>{ if(isPdf) pePdfOpen(ev.target.result); else { pePdfClose(); peBgFromDataUrl(ev.target.result); } };
   r.readAsDataURL(f); e.target.value='';
+}
+// 一般圖檔：縮圖 → 存成底圖
+function peBgFromDataUrl(dataUrl, note){
+  const im=new Image();
+  im.onload=()=>{
+    peSync();
+    const before=dataUrl.length, g=peShrinkBg(im, dataUrl);
+    peState.bg=g.url; peState.bgW=g.w; peState.bgH=g.h; peRender();
+    const kb=n=>Math.round(n/1024)+'KB';
+    const resized=(g.w!==im.width||g.h!==im.height);   // PDF 轉過來的本來就已經是目標大小，別謊報縮圖
+    setPeMsg((note?note+'　':'')+(resized
+      ? `底圖 ${im.width}×${im.height} → 縮成 ${g.w}×${g.h}（${kb(before)} → ${kb(g.url.length)}），點兩下圖面新增機台`
+      : `底圖 ${g.w}×${g.h}px 已載入（${kb(g.url.length)}），點兩下圖面新增機台`), 'ok');
+  };
+  im.onerror=()=>setPeMsg('圖檔讀不出來','err');
+  im.src=dataUrl;
+}
+// ── PDF 平面圖：轉成 PNG 當底圖 ───────────────────────────────
+// pdf.js 有 1.3MB，選到 PDF 才動態載入，平常開頁不吃這個成本
+let pePdfDoc=null;
+function peLoadPdfJs(){
+  if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if(peLoadPdfJs._p) return peLoadPdfJs._p;
+  return peLoadPdfJs._p=new Promise((res,rej)=>{
+    const sc=document.createElement('script');
+    sc.src='vendor/pdfjs/pdf.min.js';
+    sc.onload=()=>{
+      if(!window.pdfjsLib) return rej(new Error('pdf.js 載入了但沒掛上 pdfjsLib'));
+      // 轉檔在 worker 裡跑，大張圖才不會把畫面卡住；worker 起不來 pdf.js 會自己退回主執行緒
+      try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc='vendor/pdfjs/pdf.worker.min.js'; }catch(_){}
+      res(window.pdfjsLib);
+    };
+    sc.onerror=()=>{ peLoadPdfJs._p=null; rej(new Error('找不到 ui/vendor/pdfjs/pdf.min.js')); };
+    document.head.appendChild(sc);
+  });
+}
+function pePdfClose(){
+  if(pePdfDoc && pePdfDoc.destroy) try{ pePdfDoc.destroy(); }catch(_){}
+  pePdfDoc=null;
+  const el=document.getElementById('pe-bg-pg'); if(el) el.style.display='none';
+}
+function pePdfOpen(dataUrl){
+  setPeMsg('讀取 PDF…');
+  peLoadPdfJs()
+    .then(lib=>fetch(dataUrl).then(r=>r.arrayBuffer()).then(buf=>lib.getDocument({data:new Uint8Array(buf)}).promise))
+    .then(doc=>{
+      pePdfClose(); pePdfDoc=doc;
+      const box=document.getElementById('pe-bg-pg'), inp=document.getElementById('pe-bg-page');
+      if(box&&inp){ box.style.display=doc.numPages>1?'':'none'; inp.value=1; inp.max=doc.numPages;
+        const n=document.getElementById('pe-bg-pgn'); if(n) n.textContent=`／${doc.numPages} 頁`; }
+      return pePdfRender(1);
+    })
+    .catch(e=>{ pePdfClose(); setPeMsg('PDF 讀不出來：'+((e&&e.message)||e),'err'); });
+}
+function pePdfPage(n){
+  if(!pePdfDoc) return;
+  pePdfRender(Math.max(1, Math.min(pePdfDoc.numPages, Math.round(n)||1)))
+    .catch(e=>setPeMsg('這一頁畫不出來：'+((e&&e.message)||e),'err'));
+}
+// 把某一頁畫成 PNG。長邊直接對到 PE_BG_MAX，一次到位不用再縮
+function pePdfRender(pageNo){
+  const doc=pePdfDoc;
+  return doc.getPage(pageNo).then(pg=>{
+    const v1=pg.getViewport({scale:1});
+    const k=Math.min(4, PE_BG_MAX/Math.max(v1.width, v1.height));
+    const vp=pg.getViewport({scale:k});
+    const cv=document.createElement('canvas');
+    cv.width=Math.round(vp.width); cv.height=Math.round(vp.height);
+    const cx=cv.getContext('2d');
+    if(!cx) throw new Error('這個環境畫不了 canvas');
+    cx.fillStyle='#fff'; cx.fillRect(0,0,cv.width,cv.height);   // PDF 底是透明的，先鋪白
+    return pg.render({canvasContext:cx, viewport:vp}).promise.then(()=>{
+      const url=cv.toDataURL('image/jpeg', 0.85);
+      peBgFromDataUrl(url, `PDF 第 ${pageNo}／${doc.numPages} 頁 → 圖片（原尺寸 ${Math.round(v1.width)}×${Math.round(v1.height)}pt）`);
+    });
+  });
 }
 // ── 即時體檢：一邊編一邊指出會卡死或做白工的地方，不用按「驗證／乾跑」才知道 ──
 // 回傳 {stn:{i:[訊息]}, task:{i:[…]}, team:{i:[…]}, all:[…]}

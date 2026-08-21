@@ -1,0 +1,4 @@
+pdfjs-dist 3.11.174 (UMD build)
+https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-3.11.174.tgz
+只用來把上傳的 PDF 平面圖轉成底圖。選到 PDF 才會動態載入，一般開頁不吃這 1.3MB。
+選 3.x 而不是 4.x：4.x 只出 ESM(.mjs)，用 file:// 直接開會被 CORS 擋掉。
