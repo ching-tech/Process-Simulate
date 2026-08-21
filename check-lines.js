@@ -9,7 +9,7 @@ const externals=[...html.matchAll(/<script src="([^"]+)"><\/script>/g)]
   .map(p=>fs.readFileSync(p,'utf8')).join('\n');
 const src=externals+'\n'+[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n')
   + ';globalThis.__x={BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLineConfig,'
-  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,planCardGeom,peSetMpp,peSetSize,pePx2U,peSizeUnit,getPeState:()=>peState,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
+  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,planCardGeom,planDockOf,peSetMpp,peSetSize,pePx2U,peSizeUnit,getPeState:()=>peState,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
 const stub=new Proxy(function(){},{
   get:(t,k)=> k===Symbol.toPrimitive?(()=>0) : k===Symbol.toStringTag?'stub' : stub,
   set:()=>true, apply:()=>stub, construct:()=>stub});
@@ -207,6 +207,40 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
   assert.deepStrictEqual([...cp.layout.size[2]], [35,220], '公尺填的尺寸沒編譯進去');
   assert.strictEqual(planSrcFromBlueprint(cp).mPerUnit, 0.1, '再編輯時比例尺掉了');
   console.log('✓ 比例尺     量到 1 像素=0.1 公尺後，3.5×22 公尺的機台存成 35×220 像素，存檔再讀回來都對');
+}
+
+// AGV 停在它要碰的那一格那一側：放滿框停入料側、拿出滿框停對側
+{
+  const {planCardGeom,planDockOf}=ctx.__x;
+  const near=(p,q)=>Math.hypot(p[0]-q[0],p[1]-q[1]);
+  for(const f of ['N','S','W','E']){
+    const b={x:500,y:500,w:240,h:180,face:f};
+    const {slots}=planCardGeom(b,'transfer');
+    const din=planDockOf(b,0,'in'), dout=planDockOf(b,0,'out');
+    // 放料（入滿框／收空框）那側
+    for(const k of ['in_full','out_recv'])
+      assert.ok(near(din,slots[k])<near(dout,slots[k]), `入料側=${f}：放料停靠點離 ${k} 比較遠`);
+    // 取料（出滿框／退空框）那側
+    for(const k of ['in_ret','out_full'])
+      assert.ok(near(dout,slots[k])<near(din,slots[k]), `入料側=${f}：取料停靠點離 ${k} 比較遠`);
+    assert.notDeepStrictEqual(din, dout, `入料側=${f}：取放料停在同一點`);
+  }
+  console.log('✓ 停靠側     放滿框／放空框停入料側、拿出滿框／拿退空框停對側，四種擺法都對');
+}
+
+// 每一段的「算出來幾秒」要跟實際用的參數一致，不然畫面上寫的算式是騙人的
+{
+  for(const id of ['pls']){
+    const bp=BLUEPRINTS[id];
+    const rp=(bp.routeParams||[]).filter(r=>r.calcSec!=null);
+    assert.ok(rp.length, `${id} 的路段參數沒有算出來的秒數`);
+    for(const r of rp){
+      assert.strictEqual(r.calcSec, bp.defaults[r.key], `${id} ${r.label} 算出來的秒數跟預設值對不起來`);
+      assert.ok(r.calcNote && /秒|公尺/.test(r.calcNote), `${id} ${r.label} 沒寫算式`);
+    }
+    console.log(`✓ 路段算式   ${id} ${rp.length} 段都標了算式，算出來的秒數＝實際用的參數`
+      +`（例：${rp[0].label} ${rp[0].calcSec}s ← ${rp[0].calcNote}）`);
+  }
 }
 
 // 人員投料站永遠不能被選為空框回程的目的地
