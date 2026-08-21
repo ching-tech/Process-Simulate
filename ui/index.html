@@ -234,12 +234,15 @@ body.present #btn-present{background:var(--accent);color:#fff;border-color:var(-
 .pe-node.fc-W{border-left:6px solid #ffd54f}  .pe-node.fc-E{border-right:6px solid #ffd54f}
 .pe-rs{position:absolute;right:-4px;bottom:-4px;width:11px;height:11px;border-radius:3px;
   background:#fff;border:2px solid #333;cursor:nwse-resize}
-.calcrow{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:3px;
-  font-size:11px;color:var(--accent)}
+.calcrow{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:4px;
+  font-size:11px;color:var(--accent);background:var(--card);border:1px solid var(--border);
+  border-left:3px solid var(--accent);border-radius:4px;padding:3px 6px}
 .calcrow .cn{color:var(--dim)}
-.calcrow b{font-variant-numeric:tabular-nums}
-.calcrow button{padding:0 6px;font-size:10px}
-.calcrow.same{color:var(--dim)} .calcrow.same button{visibility:hidden}
+.calcrow b{font-variant-numeric:tabular-nums;font-size:12px}
+.calcrow button{padding:0 6px;font-size:10px;white-space:nowrap}
+.calcrow.same{color:var(--dim);border-left-color:var(--border)}
+.calcrow.same button{opacity:.45}
+.sec-hint{font-size:10px;color:var(--dim);margin:0 0 7px;line-height:1.4}
 #pe-msg{font-size:12px;white-space:pre-wrap;margin:6px 0;min-height:16px;color:var(--dim)}
 #pe-msg.ok{color:var(--green)} #pe-msg.err{color:var(--red)}
 .line-card-wrap{position:relative}
@@ -3207,7 +3210,8 @@ const SECTIONS=[
   {id:'equip',    title:'🏭 設備數量',     tag:'resim'},
   {id:'proc',     title:'⏱ 製程時間',     tag:'resim'},
   {id:'pickdrop', title:'🤖 取放料時間',   tag:'resim'},
-  {id:'route',    title:'🛣 路段行走時間', tag:'resim', map:true},
+  {id:'route',    title:'🛣 路段行走時間', tag:'resim', map:true,
+   hint:'每一段下面會標出「距離 ÷ AGV 速度」算出來的秒數。欄位照樣自己改，按「↺ 用算的」就回到算出來的值。'},
   {id:'live',     title:'⚡ 即時參數',     tag:'live'},
 ];
 
@@ -3299,7 +3303,8 @@ function renderParamPanel(){
   html+=`<div class="phd">${fieldHTML(TG_META)}</div>`;
   for(const sec of SECTIONS){
     const fields=PARAM_META.filter(m=>m.section===sec.id);
-    const mapHTML=sec.map?`<svg id="route-map" viewBox="0 0 280 74"></svg>`:'';
+    const mapHTML=(sec.map?`<svg id="route-map" viewBox="0 0 280 74"></svg>`:'')
+      +(sec.hint?`<p class="sec-hint">${sec.hint}</p>`:'');
     html+=`<div class="sec" id="sec-${sec.id}"><div class="sec-h" onclick="toggleSec('${sec.id}')">`
       +`<span>${sec.title}</span><span class="sec-cnt">(${fields.length})</span>`
       +`<span class="ptag ${sec.tag}">${sec.tag==='live'?'⚡即時':'↻重跑'}</span><span class="arr">▼</span></div>`
@@ -3329,13 +3334,16 @@ function renderParamPanel(){
 }
 function toggleSec(id){const el=document.getElementById('sec-'+id);if(el){el.classList.toggle('closed');saveSecState();}}
 function saveSecState(){
-  const st={};
+  const st={_calcrow:1};
   SECTIONS.forEach(s=>{const el=document.getElementById('sec-'+s.id);if(el)st[s.id]=!el.classList.contains('closed');});
   try{localStorage.setItem('sim-sec-state',JSON.stringify(st));}catch(_){}
 }
 function restoreSecState(){
   let st; try{st=JSON.parse(localStorage.getItem('sim-sec-state'));}catch(_){}
-  const use=st||{proc:true,pickdrop:false,route:false,live:true};
+  // 路段段落現在會顯示每段的算式，值得看一眼 → 舊的記憶檔補打開一次就好，不動其他段落
+  if(st && !st._calcrow){ st.route=true; st._calcrow=1;
+    try{localStorage.setItem('sim-sec-state',JSON.stringify(st));}catch(_){} }
+  const use=st||{proc:true,pickdrop:false,route:true,live:true};
   SECTIONS.forEach(s=>{const el=document.getElementById('sec-'+s.id);if(el)el.classList.toggle('closed',!use[s.id]);});
 }
 function applyLineFilter(){
