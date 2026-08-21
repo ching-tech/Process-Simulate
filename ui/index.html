@@ -468,6 +468,7 @@ html[data-theme=dark] #clk{color:var(--yellow)}
       <label>每框片數</label><input id="pe-batch" type="number" min="1" value="1" style="width:52px">
       <label>顏色</label><input id="pe-color" type="color" value="#2e8b57" style="width:36px;padding:0;height:26px">
       <label>底圖</label><input id="pe-bg" type="file" accept="image/*" onchange="peLoadBg(event)" style="width:170px;font-size:11px">
+      <label title="圖上 1 像素等於幾公尺。用「📏 量距離」量一段已知長度就會自動算出來，之後機台尺寸都能用公尺填">公尺/像素</label><input id="pe-mpp" type="number" min="0" step="0.001" placeholder="未校正" style="width:64px" onchange="peSetMpp(+this.value)">
       <label title="圖上 1 像素等於幾秒的走行時間">秒/像素</label><input id="pe-spu" type="number" min="0.001" step="0.01" value="0.1" style="width:56px" onchange="peSync()">
       <label title="用「📏 量距離」量一段已知長度來換算">實際距離</label><input id="pe-cal-m" type="number" min="0" step="0.5" placeholder="公尺" style="width:56px">
       <label>AGV 速度</label><input id="pe-cal-v" type="number" min="0" step="1" value="60" style="width:56px" title="公尺/分">
@@ -477,7 +478,7 @@ html[data-theme=dark] #clk{color:var(--yellow)}
       <div id="pe-canvas-wrap" style="position:relative;overflow:auto;max-height:46vh;border:1px solid var(--border);border-radius:6px;background:var(--card)">
         <div id="pe-canvas" style="position:relative;transform-origin:0 0;cursor:crosshair"></div>
       </div>
-      <table style="margin-top:6px"><thead><tr><th>#</th><th>名稱</th><th>型別</th><th>處理秒／容量</th><th>台數</th><th title="這一站跟前面哪一站是同一台實體設備（圖上只畫一個）">同一台</th><th>空框處理</th><th title="入滿框和收空框在這一側（AGV 停這一邊），中間是拿料位和放置位，對側是退空框和出滿框。拖機台右下角可以改大小">入料側</th><th title="模擬一開始，這一站的收空框位有沒有框">起始空框</th><th></th><th></th></tr></thead>
+      <table style="margin-top:6px"><thead><tr><th>#</th><th>名稱</th><th>型別</th><th>處理秒／容量</th><th id="pe-th-size" title="機台在現場佔的地。校正過比例尺就用公尺填，沒校正就是圖上的像素">尺寸</th><th>台數</th><th title="這一站跟前面哪一站是同一台實體設備（圖上只畫一個）">同一台</th><th>空框處理</th><th title="入滿框和收空框在這一側（AGV 停這一邊），中間是拿料位和放置位，對側是退空框和出滿框。拖機台右下角可以改大小">入料側</th><th title="模擬一開始，這一站的收空框位有沒有框">起始空框</th><th></th><th></th></tr></thead>
       <tbody id="pe-stns"></tbody></table>
     </div>
     <div class="wsec"><h4>③ 搬運任務（哪一站 → 哪一站，誰做）</h4>
@@ -2373,6 +2374,23 @@ function buildABFSVG(){
     lhd.setAttribute('class','slb');lhd.setAttribute('style','fill:#5a6a85;font-size:10px;text-anchor:start');
     lhd.textContent='框狀態圖例：'; tg.appendChild(lhd);
     drawAgvLegend(tg, lx+5*95+30, ly); // AGV 圖例（同列右側）
+    // 比例尺：量過實際距離才畫得出來
+    const mpu=LC.layout.type==='plan' && LC.layout.mPerUnit;
+    if(mpu>0){
+      // 挑一個畫起來 80~260px 的整數公尺（1/2/5/10/20/50…）
+      let m=1; while(m/mpu<80) m*= (String(m)[0]==='1'?2:(String(m)[0]==='2'?2.5:2));
+      const px=m/mpu, bx0=lx+5*95+330, by=ly+7;
+      const bar=ns('line');
+      bar.setAttribute('x1',bx0);bar.setAttribute('y1',by);bar.setAttribute('x2',bx0+px);bar.setAttribute('y2',by);
+      bar.setAttribute('stroke','#33405a');bar.setAttribute('stroke-width','3'); tg.appendChild(bar);
+      for(const ex of [bx0, bx0+px]){
+        const t=ns('line');t.setAttribute('x1',ex);t.setAttribute('y1',by-5);t.setAttribute('x2',ex);t.setAttribute('y2',by+5);
+        t.setAttribute('stroke','#33405a');t.setAttribute('stroke-width','3'); tg.appendChild(t);
+      }
+      const bt=ns('text');bt.setAttribute('x',bx0+px/2);bt.setAttribute('y',by-9);
+      bt.setAttribute('class','slb');bt.setAttribute('style','fill:#33405a;font-size:11px');
+      bt.textContent=`${m} 公尺`; tg.appendChild(bt);
+    }
   }
 
   // ── Stations ────────────────────────────────────────────────
@@ -2563,8 +2581,15 @@ function stnTipHTML(i){
     rows+=`<div class="tt-r${isNow?' tt-now':''}"><span>${h}~${h+1}hr</span>`
         +`<span>${v}${isNow?' <span class="tt-dim">← 現在</span>':''}</span></div>`;
   }
-  if(!anyData){ return `<div class="tt-h">${s.name}</div><div class="tt-dim">尚無產出</div>`; }
-  return `<div class="tt-h">${s.name}</div>${rows}`
+  const box=(function(){                       // 有量過比例尺就順便報佔地
+    const b=(typeof planBox==='function')?planBox(s):null, m=LC.layout.mPerUnit;
+    if(!b) return '';
+    const f={N:'上',S:'下',W:'左',E:'右'}[b.face];
+    const sz = m>0 ? `${(b.w*m).toFixed(1)}×${(b.h*m).toFixed(1)} m` : `${b.w}×${b.h} px`;
+    return `<div class="tt-r tt-dim"><span>佔地${f?`（入料側在${f}）`:''}</span><span>${sz}</span></div>`;
+  })();
+  if(!anyData){ return `<div class="tt-h">${s.name}</div>${box}<div class="tt-dim">尚無產出</div>`; }
+  return `<div class="tt-h">${s.name}</div>${box}${rows}`
         +`<div class="tt-r tt-avg"><span>平均</span><span>${stnAvgUPH(i)} /hr</span></div>`;
 }
 // 站別平均 UPH 常駐標籤（置中，放在站名下方）
@@ -3886,7 +3911,7 @@ function planSrcFromBlueprint(bp){
   });
   return {editId:null, name:bp.name, batch:val(bp.batchKey)||1, color:bp.color||'#2e8b57',
     pick:val(bp.pickKey)||0, drop:val(bp.dropKey)||0,
-    secPerUnit:L.secPerUnit||0.1, planScale:L.planScale||1,
+    secPerUnit:L.secPerUnit||0.1, planScale:L.planScale||1, mPerUnit:L.mPerUnit||0,
     srcPaths:L.paths||null, srcSegs:L.aisles||null, aisles:[],
     bg:(L.bg&&L.bg.href)||null, bgW:(L.bg&&L.bg.w)||0, bgH:(L.bg&&L.bg.h)||0,
     stns, tasks, teams};
@@ -3902,7 +3927,7 @@ function openPlanEd(editId){
     peState=planSrcFromBlueprint(bp);
     peState.name=bp.name+' 複本';
   } else {
-    peState={editId:null, name:'', batch:1, color:'#2e8b57', pick:30, drop:30, secPerUnit:0.1,
+    peState={editId:null, name:'', batch:1, color:'#2e8b57', pick:30, drop:30, secPerUnit:0.1, mPerUnit:0,
        bg:null, bgW:0, bgH:0, stns:[], tasks:[], teams:[{name:'G1',n:2}]};
   }
   const $=id=>document.getElementById(id);
@@ -3910,6 +3935,7 @@ function openPlanEd(editId){
   $('pe-name').value=peState.name; $('pe-batch').value=peState.batch;
   $('pe-color').value=peState.color; $('pe-pick').value=peState.pick;
   $('pe-drop').value=peState.drop;  $('pe-spu').value=peState.secPerUnit;
+  $('pe-mpp').value=peState.mPerUnit||'';
   peUndo=[]; peLast=null; peMode='move'; peLink=null; peDraft=null; peMeasure=null;
   peRender(); setPeMsg('');
   peSaved=peLast;                       // 以剛載入的狀態當「沒改過」的基準
@@ -3938,6 +3964,8 @@ function peSync(){
   peState.name=$('pe-name').value.trim(); peState.batch=+$('pe-batch').value||1;
   peState.color=$('pe-color').value; peState.pick=+$('pe-pick').value||0;
   peState.drop=+$('pe-drop').value||0; peState.secPerUnit=+$('pe-spu').value||0.1;
+  // 欄位空著就沿用現值（清空是走 peSetMpp(0)，不是靠這裡）
+  peState.mPerUnit=+$('pe-mpp').value || peState.mPerUnit || 0;
 }
 const PE_BG_MAX=1600;   // 底圖最長邊；再大對擺機台沒幫助，只會把 localStorage 撐爆
 // 縮圖 + 轉 JPEG。畫布不能用（jsdom／老瀏覽器）就原樣退回
@@ -4233,7 +4261,7 @@ function peRender(){
     const o=(s.same!=null&&peState.stns[s.same])?peState.stns[s.same]:null;   // 分身跟著本尊擺
     const b=peBoxOf(i);
     h+=`<div class="pe-node${o?' pe-alias':''}${b.face?' fc-'+b.face:''}" data-i="${i}"`
-      +` title="${s.name}${b.face?'：入料側在'+(PE_FACE.find(f=>f[0]===b.face)||[])[1]:''}（${b.w}×${b.h}）"`
+      +` title="${s.name}${b.face?'：入料側在'+(PE_FACE.find(f=>f[0]===b.face)||[])[1]:''}（${pePx2U(b.w)}×${pePx2U(b.h)} ${peSizeUnit()}）"`
       +` style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px;background:${col}`
       +`${o?';opacity:.85':''}`
       +`${peLink===i?';outline:3px solid #ffb300;outline-offset:2px':''}">${i+1}. ${s.name}`
@@ -4289,7 +4317,8 @@ function peRender(){
         const x0=ev.clientX, y0=ev.clientY;
         const mv=e=>{ st.w=Math.max(PE_MIN, Math.round(w0+(e.clientX-x0)/scale*2));
                       st.h=Math.max(PE_MIN, Math.round(h0+(e.clientY-y0)/scale*2));
-                      el.style.width=st.w+'px'; el.style.height=st.h+'px'; };
+                      el.style.width=st.w+'px'; el.style.height=st.h+'px';
+                      setPeMsg(`${st.name}：${pePx2U(st.w)} × ${pePx2U(st.h)} ${peSizeUnit()}`); };
         const up2=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up2); peRender(); };
         document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up2);
         return;
@@ -4322,9 +4351,34 @@ function peCalibrate(px){
   if(m<=0||v<=0){ peRender(); setPeMsg('請先填「實際距離(公尺)」和「AGV 速度(公尺/分)」再量','err'); return; }
   const sec=m/v*60;                                       // 走完這段要幾秒
   const spu=+(sec/px).toFixed(4);
+  const mpp=+(m/px).toFixed(4);                           // 比例尺：圖上 1 像素幾公尺
   peState.secPerUnit=spu; $('pe-spu').value=spu;
+  peState.mPerUnit=mpp;   $('pe-mpp').value=mpp;
   peRender();
-  setPeMsg(`量到 ${Math.round(px)} 像素＝${m} 公尺；${v} 公尺/分 → ${sec.toFixed(0)} 秒，秒/像素 = ${spu}`,'ok');
+  setPeMsg(`量到 ${Math.round(px)} 像素＝${m} 公尺 → 比例尺 ${mpp} 公尺/像素（機台尺寸現在可以直接填公尺）；`
+    +`${v} 公尺/分 → 走完 ${sec.toFixed(0)} 秒，秒/像素 = ${spu}`,'ok');
+}
+// 手動改比例尺。有 AGV 速度就一起把秒/像素換算好，兩個本來就是同一件事
+function peSetMpp(v){
+  const $=id=>document.getElementById(id);
+  peState.mPerUnit=v>0?v:0;
+  const sp=+($('pe-cal-v')||{}).value||0;
+  if(v>0 && sp>0){ const spu=+(v/sp*60).toFixed(4); peState.secPerUnit=spu; $('pe-spu').value=spu; }
+  peRender();
+  setPeMsg(v>0?`比例尺 ${v} 公尺/像素，機台尺寸改用公尺填`:'比例尺清掉了，機台尺寸改用像素填');
+}
+// 尺寸欄位的顯示：有比例尺就換成公尺
+function peSizeUnit(){ return peState.mPerUnit>0?'m':'px'; }
+function pePx2U(px){ return peState.mPerUnit>0 ? +(px*peState.mPerUnit).toFixed(1) : Math.round(px); }
+function peU2Px(v){ return peState.mPerUnit>0 ? Math.round(v/peState.mPerUnit) : Math.round(v); }
+// 表格改尺寸：填的是公尺就換回像素存
+function peSetSize(i,which,v){
+  const s=peState.stns[i], d=peDefSize(s.type);
+  if(s.w==null) s.w=d[0];
+  if(s.h==null) s.h=d[1];
+  // 用打的就照打的算（PE_MIN 是拖把手時的下限，不該擋住真的很小的機台）
+  s[which]=Math.max(8, peU2Px(+v||0));
+  peRender();
 }
 function peStnOpts(sel){ return peState.stns.map((s,i)=>`<option value="${i}"${i===sel?' selected':''}>${i+1}. ${s.name}</option>`).join(''); }
 function peRenderStns(L){ L=L||peLint();
@@ -4333,6 +4387,15 @@ function peRenderStns(L){ L=L||peLint();
     +`<td><input value="${s.name}" onchange="peState.stns[${i}].name=this.value;peRender()" style="width:110px"></td>`
     +`<td><select onchange="peState.stns[${i}].type=this.value;peRender()">${PE_TYPES.map(t=>`<option value="${t[0]}"${s.type===t[0]?' selected':''}>${t[1]}</option>`).join('')}</select></td>`
     +`<td>${peIsAlias(s)?`<span title="跟本尊共用" style="color:var(--dim);font-size:11px">同本尊</span>`:`<input type="number" min="1" value="${s.val}" onchange="peState.stns[${i}].val=+this.value" style="width:66px">`}</td>`
+    +`<td>${peIsAlias(s)?`<span style="color:var(--dim);font-size:11px">同本尊</span>`
+        :(function(){ const b=peBoxOf(i), u=peSizeUnit();
+            const st=peState.mPerUnit>0?'0.1':'1';
+            return `<input type="number" min="0" step="${st}" value="${pePx2U(b.w)}" title="寬（${u}）"`
+              +` onchange="peSetSize(${i},'w',this.value)" style="width:52px">`
+              +`<span style="color:var(--dim)">×</span>`
+              +`<input type="number" min="0" step="${st}" value="${pePx2U(b.h)}" title="深（${u}）"`
+              +` onchange="peSetSize(${i},'h',this.value)" style="width:52px"> <span style="font-size:10px;color:var(--dim)">${u}</span>`;
+          })()}</td>`
     +`<td>${s.type==='buffer'||s.type==='refill'||s.type==='src'?'—':(peIsAlias(s)?`<span style="color:var(--dim);font-size:11px">同本尊</span>`:`<input type="number" min="1" max="9" value="${s.n||1}" onchange="peState.stns[${i}].n=+this.value" style="width:44px">`)}</td>`
     +`<td><select onchange="peState.stns[${i}].same=this.value===''?null:+this.value;peRender()">`
         +`<option value=""${s.same==null?' selected':''}>獨立</option>`
@@ -4346,7 +4409,7 @@ function peRenderStns(L){ L=L||peLint();
         +`<option value="1"${peSeedOf(s)?' selected':''}>有</option><option value="0"${peSeedOf(s)?'':' selected'}>無</option></select>`}</td>`
     +`<td><button class="mini" title="複製這一台" onclick="peDupStn(${i})">⧉</button></td>`
     +`<td><button class="mini rst" onclick="peDelStn(${i})">✕</button></td></tr>`).join('')
-    || '<tr><td colspan="11" style="color:var(--dim);font-size:11px">在上面的圖點兩下就會新增機台</td></tr>';
+    || '<tr><td colspan="12" style="color:var(--dim);font-size:11px">在上面的圖點兩下就會新增機台</td></tr>';
 }
 function peDelStn(i){
   peState.stns.splice(i,1);
@@ -4476,6 +4539,7 @@ function peCompile(){
     // 存原始編輯狀態供再編輯；底圖不重複存（從 layout.bg 借回來），否則 localStorage 很快就爆
     planSrc: JSON.parse(JSON.stringify({...peState, editId:null, bg:null})),
     layout:{ type:'plan', xiCount:nCol, secPerUnit:peState.secPerUnit, planScale:SC,
+      mPerUnit:peState.mPerUnit||0,
       pos:Array.from({length:nCol},(_,x)=>{ const i=own.findIndex((o,j)=>col[j]===x); return [S[i].x,S[i].y]; }),
       size:Array.from({length:nCol},(_,x)=>{ const i=own.findIndex((o,j)=>col[j]===x), d=peDefSize(S[i].type);
         return [S[i].w||d[0], S[i].h||d[1]]; }),

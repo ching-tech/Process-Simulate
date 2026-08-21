@@ -9,7 +9,7 @@ const externals=[...html.matchAll(/<script src="([^"]+)"><\/script>/g)]
   .map(p=>fs.readFileSync(p,'utf8')).join('\n');
 const src=externals+'\n'+[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n')
   + ';globalThis.__x={BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLineConfig,'
-  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,planCardGeom,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
+  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,planCardGeom,peSetMpp,peSetSize,pePx2U,peSizeUnit,getPeState:()=>peState,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
 const stub=new Proxy(function(){},{
   get:(t,k)=> k===Symbol.toPrimitive?(()=>0) : k===Symbol.toStringTag?'stub' : stub,
   set:()=>true, apply:()=>stub, construct:()=>stub});
@@ -183,6 +183,26 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
   const f=x=>({N:'上',S:'下',W:'左',E:'右'})[L.face[x]];
   console.log(`✓ pls 佔地   10 欄都有佔地與入料側（③ 左線體 ${L.size[2].join('x')} 入料側${f(2)}、`
     +`⑧⑫ 研磨線 ${L.size[3].join('x')} 入料側${f(3)}，跟站名的「北入/南出」一致）`);
+}
+
+// 量過比例尺之後，機台尺寸就能直接用公尺填（存回去還是像素）
+{
+  const {planSrcFromBlueprint,peCompile,peSetState:_,setPeState,peSetMpp,peSetSize,pePx2U,peSizeUnit,getPeState}=ctx.__x;
+  const src=planSrcFromBlueprint(BLUEPRINTS.pls);
+  setPeState(src);
+  assert.strictEqual(peSizeUnit(), 'px', '沒校正比例尺時尺寸應該用像素');
+  const w0=src.stns[2].w;
+  peSetMpp(0.1);                                     // 圖上 1 像素 = 0.1 公尺
+  assert.strictEqual(peSizeUnit(), 'm', '校正過就要改用公尺');
+  assert.strictEqual(pePx2U(w0), +(w0*0.1).toFixed(1), '像素換公尺算錯');
+  peSetSize(2,'w',3.5); peSetSize(2,'h',22);         // 用公尺填
+  assert.strictEqual(getPeState().stns[2].w, 35, '3.5 公尺 ÷ 0.1 應該存成 35 像素');
+  assert.strictEqual(getPeState().stns[2].h, 220, '22 公尺 ÷ 0.1 應該存成 220 像素');
+  const cp=peCompile();
+  assert.strictEqual(cp.layout.mPerUnit, 0.1, '比例尺沒存進 layout');
+  assert.deepStrictEqual([...cp.layout.size[2]], [35,220], '公尺填的尺寸沒編譯進去');
+  assert.strictEqual(planSrcFromBlueprint(cp).mPerUnit, 0.1, '再編輯時比例尺掉了');
+  console.log('✓ 比例尺     量到 1 像素=0.1 公尺後，3.5×22 公尺的機台存成 35×220 像素，存檔再讀回來都對');
 }
 
 // 人員投料站永遠不能被選為空框回程的目的地
