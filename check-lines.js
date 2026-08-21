@@ -76,6 +76,34 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
   console.log(`✓ 走道路網   4 站 / 4 條折線 / ${n} 組站間路徑全部連通，距離都 >= 直線`);
 }
 
+// 機台佔地 + 入料側：AGV 停在入料側那一邊，走道距離要跟著變；設定也要能存進去再讀回來
+{
+  const {peBuildAisles,peCompile,planSrcFromBlueprint,setPeState}=ctx.__x;
+  const mk=face=>({secPerUnit:0.1, planScale:1, name:'面向測試', batch:1, color:'#2e8b57', pick:10, drop:10,
+    teams:[{name:'G1',n:2}],
+    tasks:[{f:0,t:1,c:'full'},{f:1,t:2,c:'full'},{f:2,t:1,c:'empty'}],
+    stns:[{name:'上料',type:'src',     val:120,n:1,empty:'',x:100,y:600, w:200,h:100, face},
+          {name:'加工',type:'transfer',val:180,n:1,empty:'self',x:500,y:600, w:60,h:40, face:'S'},
+          {name:'換框',type:'changer', val:120,n:1,empty:'',x:900,y:600, w:60,h:40, face:'S'}],
+    aisles:[[[100,700],[900,700]]]});
+  const lenOf=face=>{ setPeState(mk(face)); const P=peBuildAisles(); return P['0_2'].len; };
+  const south=lenOf('S'), north=lenOf('N'), none=lenOf('');
+  // 入料側朝走道(下) vs 背對走道(上)：多繞的正好是機台的高度 100
+  assert.strictEqual(north-south, 100, `入料側沒影響走道距離（下 ${south} / 上 ${north}）`);
+  assert.strictEqual(none-south, 50,  `沒設入料側時應該從機台正中接走道（正中 ${none} / 下 ${south}）`);
+  // 存檔再讀回來，長寬與入料側都不能掉
+  setPeState(mk('N'));
+  const cp=peCompile();
+  assert.ok(validateBlueprint(cp).ok, '有佔地的線驗證失敗');
+  assert.deepStrictEqual([...cp.layout.size[0]], [200,100], 'layout.size 沒寫進去');
+  assert.strictEqual(cp.layout.face[0], 'N', 'layout.face 沒寫進去');
+  const back=planSrcFromBlueprint(cp);
+  assert.strictEqual(back.stns[0].w, 200, '再編輯時機台寬度掉了');
+  assert.strictEqual(back.stns[0].h, 100, '再編輯時機台高度掉了');
+  assert.strictEqual(back.stns[0].face, 'N', '再編輯時入料側掉了');
+  console.log(`✓ 機台佔地   200x100 的機台，入料側朝走道 ${south} / 背對走道 ${north} / 未設 ${none} — 長寬與入料側存得回來`);
+}
+
 // PLS 丟進平面版面編輯器再編譯回來，要還是同一條線（同一台設備／走道路徑／路段時間都不能掉）
 {
   const {planSrcFromBlueprint,peCompile,peLint,setPeState}=ctx.__x, pls=BLUEPRINTS.pls;
