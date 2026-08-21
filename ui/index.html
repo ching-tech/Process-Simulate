@@ -477,7 +477,7 @@ html[data-theme=dark] #clk{color:var(--yellow)}
       <div id="pe-canvas-wrap" style="position:relative;overflow:auto;max-height:46vh;border:1px solid var(--border);border-radius:6px;background:var(--card)">
         <div id="pe-canvas" style="position:relative;transform-origin:0 0;cursor:crosshair"></div>
       </div>
-      <table style="margin-top:6px"><thead><tr><th>#</th><th>名稱</th><th>型別</th><th>處理秒／容量</th><th>台數</th><th title="這一站跟前面哪一站是同一台實體設備（圖上只畫一個）">同一台</th><th>空框處理</th><th title="入滿框和入空框一定在同一側；AGV 就停這一邊。拖機台右下角可以改大小">入料側</th><th title="模擬一開始，這一站的收空框位有沒有框">起始空框</th><th></th><th></th></tr></thead>
+      <table style="margin-top:6px"><thead><tr><th>#</th><th>名稱</th><th>型別</th><th>處理秒／容量</th><th>台數</th><th title="這一站跟前面哪一站是同一台實體設備（圖上只畫一個）">同一台</th><th>空框處理</th><th title="入滿框和收空框在這一側（AGV 停這一邊），中間是拿料位和放置位，對側是退空框和出滿框。拖機台右下角可以改大小">入料側</th><th title="模擬一開始，這一站的收空框位有沒有框">起始空框</th><th></th><th></th></tr></thead>
       <tbody id="pe-stns"></tbody></table>
     </div>
     <div class="wsec"><h4>③ 搬運任務（哪一站 → 哪一站，誰做）</h4>
@@ -1988,6 +1988,98 @@ function toggleSeedEmpty(i){
   if(typeof refreshDirty==='function') refreshDirty();
   toast(`${s.name.replace(/_\d+$/,'')}：一開始${P[s.seedKey]?'有':'沒有'}空框`,'ok');
 }
+// 任意方向的流向箭頭：一條線 + 尖端三角形（水平版的 makeArrow 只能往右）
+function makeArrowAt(g, p1, p2, color){
+  const c=color||'#8090aa', dx=p2[0]-p1[0], dy=p2[1]-p1[1], L=Math.hypot(dx,dy)||1;
+  const ux=dx/L, uy=dy/L, tip=[p2[0],p2[1]], b=[p2[0]-ux*6, p2[1]-uy*6];
+  const ln=ns('line');
+  ln.setAttribute('x1',p1[0]);ln.setAttribute('y1',p1[1]);
+  ln.setAttribute('x2',b[0]); ln.setAttribute('y2',b[1]);
+  ln.setAttribute('stroke',c);ln.setAttribute('stroke-width','1.5'); g.appendChild(ln);
+  const tr=ns('polygon');
+  tr.setAttribute('points',`${tip[0]},${tip[1]} ${b[0]-uy*3.5},${b[1]+ux*3.5} ${b[0]+uy*3.5},${b[1]-ux*3.5}`);
+  tr.setAttribute('fill',c); g.appendChild(tr);
+}
+// ── 平面版面：機台照現場佔地畫，格位排成「入料側 → 中間 → 對側」──────────
+// 入滿框／收空框在入料側那一邊，拿料位／放置位在中間，退空框／出滿框在對側，
+// 跟實際機台一樣是「一邊進、一邊出」。
+// 純幾何：格位在圖上的位置。畫圖與自我檢查共用，不碰 DOM
+function planCardGeom(b, mtype){
+  const face=b.face||'N';                       // 沒設入料側就當作在上（跟舊卡片的排法最接近）
+  const vert=(face==='N'||face==='S');
+  const D=vert?b.h:b.w, C=vert?b.w:b.h;         // D＝深度（入料側→對側）、C＝橫向
+  const sgn=(face==='N'||face==='W')?1:-1;
+  const pt=(u,v)=> vert ? [b.x+v*sgn, b.y+sgn*(u-D/2)] : [b.x+sgn*(u-D/2), b.y+v];
+  // 兩條料流（入料流／出料流）並排；只有加工機兩條都有，其餘只有一條走中線
+  const two = (mtype==='transfer');
+  const lanes = two ? [[-C*0.24, ['in_full','in_proc','in_ret'], ['入滿框','拿料位','退空框']],
+                       [ C*0.24, ['out_recv','out_proc','out_full'], ['收空框','放置位','出滿框']]]
+             : mtype==='changer' ? [[0, ['in_full','in_proc','in_ret'], ['入滿框','拿料位','退空框']]]
+             :                     [[0, ['recv','proc','out'],        ['收空框','空框放置','出滿框']]];
+  const bu=[D*0.22, D*0.5, D*0.78];
+  const slots={};
+  for(const [v,keys] of lanes) keys.forEach((k,j)=>{ slots[k]=pt(bu[j], v); });
+  return {vert, D, C, pt, two, lanes, bu, slots};
+}
+function drawPlanStation(g, s, i, gc, b){
+  const {vert, D, C, pt, two, lanes, bu}=planCardGeom(b, s.mtype);
+  // 外框＝現場佔地
+  const r=ns('rect');
+  r.setAttribute('x',b.x-b.w/2);r.setAttribute('y',b.y-b.h/2);
+  r.setAttribute('width',b.w);r.setAttribute('height',b.h);r.setAttribute('rx',6);
+  r.setAttribute('fill','#ffffff');r.setAttribute('stroke',gc.lbl);r.setAttribute('stroke-width','2');
+  g.appendChild(r);
+  // 入料側那一條邊畫成粗黃線：AGV 停這一邊，入滿框和收空框都在這一側
+  if(b.face){
+    const e0=pt(0,-C/2), e1=pt(0,C/2);
+    const fl=ns('line');
+    fl.setAttribute('x1',e0[0]);fl.setAttribute('y1',e0[1]);fl.setAttribute('x2',e1[0]);fl.setAttribute('y2',e1[1]);
+    fl.setAttribute('stroke','#e8a33d');fl.setAttribute('stroke-width','6');fl.setAttribute('stroke-linecap','round');
+    const ft=ns('title'); ft.textContent=`${s.name}：入料側（入滿框／收空框都在這一邊）`; fl.appendChild(ft);
+    g.appendChild(fl);
+  }
+  // 名稱／UPH／計時放在對側外面，框內整片留給格位
+  const nm=pt(D+15,0), up=pt(D+29,0), tm=pt(D+42,0);
+  const nt=ns('text');nt.setAttribute('x',nm[0]);nt.setAttribute('y',nm[1]);
+  nt.setAttribute('class','slb');nt.setAttribute('style',`font-weight:bold;font-size:13px;fill:${gc.lbl}`);
+  nt.textContent=s.name; g.appendChild(nt);
+  addStnUphLabel(g, i, up[0], up[1], 11);
+  if(!s.buf){
+    const mt=ns('text');mt.setAttribute('x',tm[0]);mt.setAttribute('y',tm[1]);
+    mt.setAttribute('class','slb');mt.setAttribute('id',`abf-timer-${i}`);
+    mt.setAttribute('style',`fill:${gc.lbl};font-size:11px`);mt.textContent='⏱ idle'; g.appendChild(mt);
+  }
+  // 緩衝站沒有格位，畫存量數字與長條
+  if(s.buf){
+    const c0=pt(D*0.42,0), c1=pt(D*0.62,0);
+    const wt=ns('text');wt.setAttribute('x',c0[0]);wt.setAttribute('y',c0[1]);
+    wt.setAttribute('class','slb');wt.setAttribute('style','fill:#b8860b;font-size:15px;font-weight:bold');
+    wt.setAttribute('id',`abf-buf-${i}`);wt.textContent=`0/${s.buf}`; g.appendChild(wt);
+    const bw=Math.min(b.w-16, 88);
+    const bx=ns('rect');bx.setAttribute('x',c1[0]-bw/2);bx.setAttribute('y',c1[1]-3);
+    bx.setAttribute('width',bw);bx.setAttribute('height',7);bx.setAttribute('rx',3);
+    bx.setAttribute('fill','#e3e9f2'); g.appendChild(bx);
+    const bf=ns('rect');bf.setAttribute('x',c1[0]-bw/2);bf.setAttribute('y',c1[1]-3);
+    bf.setAttribute('width',0);bf.setAttribute('height',7);bf.setAttribute('rx',3);
+    bf.setAttribute('fill',gc.lbl);bf.setAttribute('id',`abf-bar-${i}`); g.appendChild(bf);
+    return;
+  }
+  const sd=Math.max(10, Math.min(26, D*0.24));              // 格位在深度方向的大小
+  const sc=Math.max(12, Math.min(34, C*(two?0.40:0.55)));   // 格位在橫向的大小
+  const sw=vert?sc:sd, sh=vert?sd:sc;
+  // 太小就不標字，免得糊成一團（滑過去還是看得到 tooltip）
+  const room = vert ? (D*0.28-sd>=11 && sc>=26) : (C*(two?0.48:1)-sc>=11 && sd>=20);
+  for(const [v, keys, lbls] of lanes){
+    for(let k=0;k<3;k++){
+      const c=pt(bu[k], v);
+      makeSlot(g, c[0], c[1], `abf-slot-${i}-${keys[k]}`, room?lbls[k]:'', sw, sh);
+      if(k<2) makeArrowAt(g, pt(bu[k]+sd/2+2, v), pt(bu[k+1]-sd/2-2, v), gc.fwd);
+    }
+    if(keys[0]==='recv'||keys[0]==='out_recv'){            // 收空框那一格可以點：切換一開始有沒有空框
+      const c=pt(bu[0], v); makeSeedToggle(g, i, s, c[0], c[1]);
+    }
+  }
+}
 function makeArrow(g, x1, y, x2, color){
   const c=color||'#8090aa';
   const ln=ns('line');
@@ -2123,25 +2215,6 @@ function buildABFSVG(){
       l.setAttribute('stroke','#8aa0b8');l.setAttribute('stroke-width','5');
       l.setAttribute('stroke-linecap','round');l.setAttribute('opacity','0.45');
       tg.appendChild(l);
-    }
-    // 機台在現場佔的地：長方形外框，入料側那一邊畫成粗黃線（AGV 就停這一側）
-    for(const st of abfSt){
-      if(st.alias) continue;
-      const b=planBox(st); if(!b) continue;
-      const fr=ns('rect');
-      fr.setAttribute('x',b.x-b.w/2);fr.setAttribute('y',b.y-b.h/2);
-      fr.setAttribute('width',b.w);fr.setAttribute('height',b.h);fr.setAttribute('rx',4);
-      fr.setAttribute('fill','#8aa0b8');fr.setAttribute('fill-opacity','0.10');
-      fr.setAttribute('stroke','#5a6a85');fr.setAttribute('stroke-width','1.5');
-      fr.setAttribute('stroke-dasharray','6 4'); tg.appendChild(fr);
-      if(!b.face) continue;
-      const e={N:[b.x-b.w/2,b.y-b.h/2,b.x+b.w/2,b.y-b.h/2], S:[b.x-b.w/2,b.y+b.h/2,b.x+b.w/2,b.y+b.h/2],
-               W:[b.x-b.w/2,b.y-b.h/2,b.x-b.w/2,b.y+b.h/2], E:[b.x+b.w/2,b.y-b.h/2,b.x+b.w/2,b.y+b.h/2]}[b.face];
-      const fl=ns('line');
-      fl.setAttribute('x1',e[0]);fl.setAttribute('y1',e[1]);fl.setAttribute('x2',e[2]);fl.setAttribute('y2',e[3]);
-      fl.setAttribute('stroke','#e8a33d');fl.setAttribute('stroke-width','6');fl.setAttribute('stroke-linecap','round');
-      const ft=ns('title'); ft.textContent=`${st.name}：入滿框／入空框都在這一側`; fl.appendChild(ft);
-      tg.appendChild(fl);
     }
     // 每一段搬運沿走道畫出來（實線＝送滿框、虛線＝空框回程），顏色＝負責的那一隊
     LC.groups.forEach((g,gi)=>{
@@ -2303,7 +2376,9 @@ function buildABFSVG(){
     const gi=stGrp(s.xi);
     const gc=GRP_CLR[gi];
 
-    if(s.mtype==='refill'){
+    const pb=planBox(s);
+    if(pb){ drawPlanStation(g, s, i, gc, pb); }
+    else if(s.mtype==='refill'){
       const bw=132,bh=108;
       // Group glow
       const gl=ns('rect');
@@ -3777,7 +3852,7 @@ function planSrcFromBlueprint(bp){
     const type = c.type==='refill'  ? (c.noReturn?'src':'refill')
                : c.type==='changer' ? (c.dropEmpty?'sink':'changer') : c.type;
     const pos=(L.pos&&L.pos[c.xi])||[100+i*120,150];
-    const sz=(L.size&&L.size[c.xi])||[PE_W,PE_H];
+    const sz=(L.size&&L.size[c.xi])||peDefSize(type);
     return {name:c.name, type, oxi:c.xi, same:own,
       w:sz[0], h:sz[1], face:(L.face&&L.face[c.xi])||'',
       val: c.bufKey ? (val(c.bufKey)||6) : (val(c.procKey)||360),
@@ -4010,14 +4085,18 @@ function peRenderTools(){
 }
 let peTeamSel=0;
 // 機台在平面圖上的實際佔地（像素，跟 pos 同一個座標系）與入料側
-const PE_W=64, PE_H=44, PE_MIN=20;
+const PE_W=192, PE_H=168, PE_MIN=40;
+// 預設佔地照各型別現在畫出來的卡片尺寸，沒量過實際尺寸的機台看起來就跟以前一樣
+const PE_SIZE={refill:[132,108], src:[132,108], buffer:[110,86], changer:[156,110], sink:[156,110]};
+function peDefSize(t){ return PE_SIZE[t]||[PE_W,PE_H]; }
 // 入滿框和入空框在現場一定是同一側，所以只需要一個「入料側」
 const PE_FACE=[['','未設（停正中）'],['S','下'],['N','上'],['W','左'],['E','右']];
 // 分身（同一台設備的第二個製程步驟）跟本尊同一個框，只往右下挪一點才看得到
 function peBoxOf(i){
   const s=peState.stns[i]; if(!s) return null;
   const o=(s.same!=null&&peState.stns[s.same])?peState.stns[s.same]:null, b=o||s;
-  return {x:(o?o.x+14:s.x), y:(o?o.y+14:s.y), w:b.w||PE_W, h:b.h||PE_H, face:b.face||''};
+  const d=peDefSize(b.type);
+  return {x:(o?o.x+14:s.x), y:(o?o.y+14:s.y), w:b.w||d[0], h:b.h||d[1], face:b.face||''};
 }
 // AGV 停靠點＝入料側那一邊的中點；沒指定入料側就照舊停正中
 function peDockAt(b){
@@ -4177,8 +4256,9 @@ function peRender(){
     if(ev.target.classList.contains('pe-node')) return;
     const [x,y]=at(ev);
     peSync();
-    peState.stns.push({name:'站'+(peState.stns.length+1), type:peState.stns.length?'transfer':'refill',
-      val:360, n:1, empty:'', x, y, w:PE_W, h:PE_H, face:''});
+    const ty=peState.stns.length?'transfer':'refill', dz=peDefSize(ty);
+    peState.stns.push({name:'站'+(peState.stns.length+1), type:ty,
+      val:360, n:1, empty:'', x, y, w:dz[0], h:dz[1], face:''});
     peRender();
   };
   cv.querySelectorAll('.pe-node').forEach(el=>{
@@ -4198,7 +4278,7 @@ function peRender(){
       const i=+el.dataset.i, r=cv.getBoundingClientRect();
       if(peState.stns[i].same!=null) return;              // 分身位置跟著本尊，不單獨拖
       if(ev.target.classList.contains('pe-rs')){          // 右下角把手＝改機台佔地大小
-        const st=peState.stns[i], w0=st.w||PE_W, h0=st.h||PE_H;
+        const st=peState.stns[i], d0=peDefSize(st.type), w0=st.w||d0[0], h0=st.h||d0[1];
         const x0=ev.clientX, y0=ev.clientY;
         const mv=e=>{ st.w=Math.max(PE_MIN, Math.round(w0+(e.clientX-x0)/scale*2));
                       st.h=Math.max(PE_MIN, Math.round(h0+(e.clientY-y0)/scale*2));
@@ -4366,8 +4446,9 @@ function peCompile(){
     const k=`${id}_${a}_${b}`; if(seen[k]) continue; seen[k]=1;
     const rec=pathOf(a,b); if(rec) paths[`${a}_${b}`]=rec;
     const oa=S[own.findIndex((o,j)=>col[j]===a)], ob=S[own.findIndex((o,j)=>col[j]===b)];
-    const da=peDockAt({x:oa.x,y:oa.y,w:oa.w||PE_W,h:oa.h||PE_H,face:oa.face||''});
-    const db=peDockAt({x:ob.x,y:ob.y,w:ob.w||PE_W,h:ob.h||PE_H,face:ob.face||''});
+    const dza=peDefSize(oa.type), dzb=peDefSize(ob.type);
+    const da=peDockAt({x:oa.x,y:oa.y,w:oa.w||dza[0],h:oa.h||dza[1],face:oa.face||''});
+    const db=peDockAt({x:ob.x,y:ob.y,w:ob.w||dzb[0],h:ob.h||dzb[1],face:ob.face||''});
     const dist=rec ? rec.len*SC : Math.hypot(da[0]-db[0], da[1]-db[1]);
     routeParams.push({key:k, label:`${oa.name} ↔ ${ob.name}`,
       seg: b===a+1?('s'+a):`d${a}_${b}`, pair:[a,b]});
@@ -4389,7 +4470,8 @@ function peCompile(){
     planSrc: JSON.parse(JSON.stringify({...peState, editId:null, bg:null})),
     layout:{ type:'plan', xiCount:nCol, secPerUnit:peState.secPerUnit, planScale:SC,
       pos:Array.from({length:nCol},(_,x)=>{ const i=own.findIndex((o,j)=>col[j]===x); return [S[i].x,S[i].y]; }),
-      size:Array.from({length:nCol},(_,x)=>{ const i=own.findIndex((o,j)=>col[j]===x); return [S[i].w||PE_W, S[i].h||PE_H]; }),
+      size:Array.from({length:nCol},(_,x)=>{ const i=own.findIndex((o,j)=>col[j]===x), d=peDefSize(S[i].type);
+        return [S[i].w||d[0], S[i].h||d[1]]; }),
       face:Array.from({length:nCol},(_,x)=>{ const i=own.findIndex((o,j)=>col[j]===x); return S[i].face||''; }),
       aisles:(function(){                                   // 折線攤成 [x1,y1,x2,y2]，主畫面才畫得出來
         const segs=(peState.aisles||[]).flatMap(a=>a.slice(0,-1).map((q,k)=>[q[0],q[1],a[k+1][0],a[k+1][1]]))

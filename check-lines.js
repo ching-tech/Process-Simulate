@@ -9,7 +9,7 @@ const externals=[...html.matchAll(/<script src="([^"]+)"><\/script>/g)]
   .map(p=>fs.readFileSync(p,'utf8')).join('\n');
 const src=externals+'\n'+[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n')
   + ';globalThis.__x={BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLineConfig,'
-  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
+  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,planCardGeom,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
 const stub=new Proxy(function(){},{
   get:(t,k)=> k===Symbol.toPrimitive?(()=>0) : k===Symbol.toStringTag?'stub' : stub,
   set:()=>true, apply:()=>stub, construct:()=>stub});
@@ -102,6 +102,37 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
   assert.strictEqual(back.stns[0].h, 100, '再編輯時機台高度掉了');
   assert.strictEqual(back.stns[0].face, 'N', '再編輯時入料側掉了');
   console.log(`✓ 機台佔地   200x100 的機台，入料側朝走道 ${south} / 背對走道 ${north} / 未設 ${none} — 長寬與入料側存得回來`);
+}
+
+// 機台格位排法：入滿框／收空框在入料側，中間拿料位／放置位，對側退空框／出滿框
+{
+  const {planCardGeom}=ctx.__x;
+  const box=face=>({x:1000, y:1000, w:240, h:180, face});
+  // 深度方向（入料側→對側）的座標軸與正負號
+  const ax={N:[1,1], S:[1,-1], W:[0,1], E:[0,-1]};
+  for(const f of ['N','S','W','E']){
+    const b=box(f), {slots}=planCardGeom(b,'transfer');
+    const [d,sg]=ax[f], cr=1-d;                       // d＝深度軸、cr＝橫向軸
+    const dep=k=>slots[k][d]*sg, crs=k=>slots[k][cr];
+    // 三段深度：入料側 → 中間 → 對側
+    for(const lane of [['in_full','in_proc','in_ret'],['out_recv','out_proc','out_full']])
+      assert.ok(dep(lane[0])<dep(lane[1]) && dep(lane[1])<dep(lane[2]),
+        `入料側=${f} 時 ${lane.join('→')} 沒有由入料側往對側排`);
+    // 入滿框與收空框同一段深度（都貼在入料側），拿料位／放置位同一段，退空框／出滿框同一段
+    for(const [a,c] of [['in_full','out_recv'],['in_proc','out_proc'],['in_ret','out_full']]){
+      assert.strictEqual(Math.round(dep(a)), Math.round(dep(c)), `入料側=${f} 時 ${a} 與 ${c} 不同一排`);
+      assert.notStrictEqual(Math.round(crs(a)), Math.round(crs(c)), `入料側=${f} 時 ${a} 與 ${c} 疊在一起`);
+    }
+    // 入料側那一排要真的貼在入料側那條邊上（在框內、離邊 1/4 深度以內）
+    const half=(d===1?b.h:b.w)/2;
+    assert.ok(Math.abs(dep('in_full')-(1000*sg-half))<half*0.6, `入料側=${f} 時入滿框沒靠在入料側`);
+  }
+  // 沒有出料端的站（人員投料／換框機）只有一排，也要照同樣順序
+  const {slots:rs}=planCardGeom(box('N'),'refill');
+  assert.ok(rs.recv[1]<rs.proc[1] && rs.proc[1]<rs.out[1], '人員投料站的格位順序不對');
+  const {slots:cs}=planCardGeom(box('E'),'changer');
+  assert.ok(cs.in_full[0]>cs.in_proc[0] && cs.in_proc[0]>cs.in_ret[0], '換框機（入料側在右）的格位順序不對');
+  console.log('✓ 機台格位   入料側在上/下/左/右四種擺法，入滿框＋收空框都貼入料側、中間拿料/放置、對側退空/出滿');
 }
 
 // PLS 丟進平面版面編輯器再編譯回來，要還是同一條線（同一台設備／走道路徑／路段時間都不能掉）
