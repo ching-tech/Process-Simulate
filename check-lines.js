@@ -9,7 +9,7 @@ const externals=[...html.matchAll(/<script src="([^"]+)"><\/script>/g)]
   .map(p=>fs.readFileSync(p,'utf8')).join('\n');
 const src=externals+'\n'+[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n')
   + ';globalThis.__x={BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLineConfig,'
-  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,planCardGeom,planDockOf,routeCalc,peSetSpeed,selfRetCalc,legSec,stnSamePlace,stnTwoSided,groupSrcCands,stnSrcETA,planAhead,buildSimState,setSim:(lc,b)=>{LC=lc;abfSt=b.st;abfAGVs=b.agvs;simT=0;abfPcs=0;abfOut=[];},agvs:()=>abfAGVs,pcs:()=>abfPcs,stepAll:(n)=>{for(let k=0;k<n;k++){updateABFMachines(2);for(const a of abfAGVs)stepABFAgv(a,2);simT+=2;}return abfPcs;},peSetMpp,peSetSize,pePx2U,peSizeUnit,getPeState:()=>peState,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
+  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,planCardGeom,planDockOf,routeCalc,peSetSpeed,selfRetCalc,legSec,stnSamePlace,stnTwoSided,groupSrcCands,stnSrcETA,planAhead,setPre:v=>{P.preWait=v},getPre:()=>P.preWait,buildSimState,setSim:(lc,b)=>{LC=lc;abfSt=b.st;abfAGVs=b.agvs;simT=0;abfPcs=0;abfOut=[];},agvs:()=>abfAGVs,pcs:()=>abfPcs,stepAll:(n)=>{for(let k=0;k<n;k++){updateABFMachines(2);for(const a of abfAGVs)stepABFAgv(a,2);simT+=2;}return abfPcs;},peSetMpp,peSetSize,pePx2U,peSizeUnit,getPeState:()=>peState,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
 const stub=new Proxy(function(){},{
   get:(t,k)=> k===Symbol.toPrimitive?(()=>0) : k===Symbol.toStringTag?'stub' : stub,
   set:()=>true, apply:()=>stub, construct:()=>stub});
@@ -372,6 +372,16 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
   assert.ok(saw>0, '從來沒先開過去等');
   assert.ok(cross>0, '只會在原地繞，沒有真的先開到別站');
   assert.ok(ctx.__x.pcs()>0, '加了預先出發後跑不出料');
+  // preWait=0 就整個關掉；示意圖版面（ABF/SMK）本來就不吃這一招
+  const keep=ctx.__x.getPre(); ctx.__x.setPre(0);
+  setSim(buildLineConfig(bp), buildSimState(buildLineConfig(bp)));
+  let off=0; for(let k=0;k<800;k++){ stepAll(1); for(const a of agvs()) if(a.phase==='repos') off++; }
+  ctx.__x.setPre(keep);
+  assert.strictEqual(off, 0, 'preWait=0 還是會先出發');
+  const alc=buildLineConfig(BLUEPRINTS.abf);
+  setSim(alc, buildSimState(alc));
+  let sch=0; for(let k=0;k<800;k++){ stepAll(1); for(const a of agvs()) if(a.phase==='repos') sch++; }
+  assert.strictEqual(sch, 0, 'ABF （示意圖版面）不該先出發');
   console.log(`✓ 預先出發   沒事做的車會看哪個取料點快好了（ETA=機台剩餘時間）`
     +`，接得上就先開過去停在取料口等`);
 }

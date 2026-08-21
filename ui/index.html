@@ -540,6 +540,9 @@ const DEF = {
   smkSdCln:1, smkSdCz:1, smkSdPress:1, smkSdExp:1, smkSdDev:1, smkSdUvq:1,
   abfBt:1,                            // ABF 每框片數
   tg:4000,                            // 目標產量（兩線共用）
+  // 預先出發：AGV 沒事做時，若某個取料點「還要多久才好」減掉「走過去要多久」
+  // 不超過這個秒數，就先開過去等。0＝關掉，車只在料好了才動
+  preWait:120,
   // AGV 取/放料時間（transfer/changer 站用）
   pickTime:0, dropTime:0,
   // 緩衝站（Annealing/Baking/Postcure）取/放料時間
@@ -1171,8 +1174,12 @@ function stnSrcETA(si, c){
 }
 // 先出發：現在沒事做，但某個取料點快好了 → 比「走過去要多久」跟「還要多久才好」，
 // 接得上就先開過去等。走到一半有任務進來會被叫走（見 stepABFAgv）
-const PRE_MAX_WAIT = 120;   // 走到之後最多願意再空等幾秒；再久就先待在原地
+// 走到之後最多願意再空等幾秒；再久就先待在原地。0＝關掉「預先出發」
 function planAhead(agv){
+  if(!(P.preWait>0)) return false;          // 參數設 0 ＝ 不預先出發，車就待在原地等
+  // 只有平面版面線有真實座標，車走到一半被叫走時算得出它在哪、剩多遠。
+  // ABF/SMK 那種示意圖版面沒有這個資訊，先出發到一半被叫走等於白走，實測會變慢
+  if(!LC || LC.layout.type!=='plan') return false;
   const g=LC.groups[agv.grp-1];
   let best=null;
   for(const {si,c} of groupSrcCands(g)){
@@ -1185,7 +1192,7 @@ function planAhead(agv){
     const trav=legSec(agv.pos, si);
     if(!(trav>0)) continue;
     const slack=eta-trav;                                           // 走到之後還要空等多久
-    if(slack>PRE_MAX_WAIT) continue;                                // 還太早，先別動
+    if(slack>(P.preWait??120)) continue;                            // 還太早，先別動
     if(!best || slack<best.slack) best={si, trav, slack};
   }
   if(!best) return false;
@@ -3449,13 +3456,17 @@ function buildParamMeta(){
   }
   return out;
 }
+// 全線共用的排程參數
+// 只有平面版面線（PLS 與自建線）吃得到；ABF/SMK 是示意圖版面，沒有真實座標
+const PRE_META={key:'preWait',label:'🔮 預先出發（等待上限）',unit:'秒',min:0,max:3600,step:10,type:'int',
+  apply:'resim',line:'both',section:'route'};
 const TG_META={key:'tg',label:'🎯 目標產量',unit:'片',min:1,step:100,type:'int',apply:'live',line:'both',section:'goal'};
-let PARAM_META=buildParamMeta();
+let PARAM_META=buildParamMeta().concat([PRE_META]);
 let ALL_META=PARAM_META.concat([TG_META]);
 let PARAM_BY_KEY=Object.fromEntries(ALL_META.map(m=>[m.key,m]));
 // 自訂線載入/變更後重建參數中繼資料
 function rebuildParamMeta(){
-  PARAM_META=buildParamMeta();
+  PARAM_META=buildParamMeta().concat([PRE_META]);
   ALL_META=PARAM_META.concat([TG_META]);
   PARAM_BY_KEY=Object.fromEntries(ALL_META.map(m=>[m.key,m]));
 }
