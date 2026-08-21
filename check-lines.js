@@ -9,7 +9,7 @@ const externals=[...html.matchAll(/<script src="([^"]+)"><\/script>/g)]
   .map(p=>fs.readFileSync(p,'utf8')).join('\n');
 const src=externals+'\n'+[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n')
   + ';globalThis.__x={BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLineConfig,'
-  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,planCardGeom,planDockOf,peSetMpp,peSetSize,pePx2U,peSizeUnit,getPeState:()=>peState,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
+  + 'planSrcFromBlueprint,peCompile,peBuildAisles,peLint,planCardGeom,planDockOf,routeCalc,peSetSpeed,peSetMpp,peSetSize,pePx2U,peSizeUnit,getPeState:()=>peState,setPeState:v=>{peState=v},applyDefaults:d=>Object.assign(P,d)};';
 const stub=new Proxy(function(){},{
   get:(t,k)=> k===Symbol.toPrimitive?(()=>0) : k===Symbol.toStringTag?'stub' : stub,
   set:()=>true, apply:()=>stub, construct:()=>stub});
@@ -241,6 +241,31 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
     console.log(`✓ 路段算式   ${id} ${rp.length} 段都標了算式，算出來的秒數＝實際用的參數`
       +`（例：${rp[0].label} ${rp[0].calcSec}s ← ${rp[0].calcNote}）`);
   }
+}
+
+// 舊版存的自訂線沒有 calcSec，要能照 layout 現算，而且算出來要跟當初編譯的值一模一樣
+{
+  const {planSrcFromBlueprint,peCompile,setPeState,routeCalc,peSetMpp,peSetSpeed}=ctx.__x;
+  const src=planSrcFromBlueprint(BLUEPRINTS.pls);
+  src.srcPaths=null; src.srcSegs=null;          // 拿掉走道 → 走直線退路，才驗得到停靠點那段
+  setPeState(src);
+  const cp=peCompile();
+  assert.ok(cp.routeParams.length, '沒有路段參數');
+  for(const rp of cp.routeParams){
+    const old={...rp}; delete old.calcSec; delete old.calcNote;   // 模擬舊存檔
+    const c=routeCalc(cp, old);
+    assert.ok(c, `${rp.label} 現算不出來`);
+    assert.strictEqual(c.sec, cp.defaults[rp.key], `${rp.label} 現算 ${c.sec}s 跟編譯出來的 ${cp.defaults[rp.key]}s 對不上`);
+  }
+  // 有比例尺時算式改用公尺
+  setPeState(src); peSetMpp(0.05); peSetSpeed(50);
+  const cp2=peCompile();
+  const r2={...cp2.routeParams[0]}; delete r2.calcSec; delete r2.calcNote;
+  const c2=routeCalc(cp2, r2);
+  assert.strictEqual(c2.sec, cp2.defaults[cp2.routeParams[0].key], '有比例尺時現算對不上');
+  assert.ok(/公尺 ÷ 50 公尺\/分/.test(c2.note), '有比例尺時算式沒寫成「公尺 ÷ 速度」：'+c2.note);
+  console.log(`✓ 舊存檔     ${cp.routeParams.length} 段沒有 calcSec 也能現算，`
+    +`且跟編譯出來的秒數一致（例：${c2.note} = ${c2.sec}s）`);
 }
 
 // 人員投料站永遠不能被選為空框回程的目的地

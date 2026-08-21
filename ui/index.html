@@ -3167,6 +3167,29 @@ function fmtMMSS(sec){const m=Math.floor(sec/60),s=sec%60;return `${m}:${String(
 
 // ── 參數 metadata：由 BLUEPRINTS 動態產生（混合：機械欄位自動標籤、路段標籤由 blueprint 宣告）──
 // 預設值仍存於 DEF（parity 安全）。apply: 'live'=即時、'resim'=重跑。欄位 id = 'p-'+key
+// 路段「照圖算出來」是幾秒。存檔時有算好就用存的（PLS 用 pt×秒/pt，單位不同），
+// 沒有就照 layout 現算一次 —— 這一版之前存的自訂線都沒有這個欄位，不現算就整排看不到
+function routeCalc(bp, rp){
+  if(rp.calcSec!=null) return {sec:rp.calcSec, note:rp.calcNote};
+  const L=bp.layout;
+  if(!L || L.type!=='plan' || !rp.pair) return null;
+  const [a,b]=rp.pair, SC=L.planScale||1, k=L.secPerUnit||0.1, pos=L.pos;
+  const rec=L.paths && L.paths[`${Math.min(a,b)}_${Math.max(a,b)}`];
+  // 沒有走道就用兩台機台的停靠點直線距離（跟編譯時算的一樣，不然這裡寫的秒數會跟欄位對不上）
+  const dockAt=x=>{
+    if(!pos||!pos[x]) return null;
+    const sz=L.size&&L.size[x];
+    if(!sz) return pos[x];
+    return planDockOf({x:pos[x][0], y:pos[x][1], w:sz[0], h:sz[1], face:(L.face&&L.face[x])||''}) || pos[x];
+  };
+  const pa=dockAt(a), pb=dockAt(b);
+  const dist = rec ? rec.len*SC : (pa&&pb ? Math.hypot(pa[0]-pb[0], pa[1]-pb[1]) : 0);
+  if(!dist) return null;
+  const note = L.mPerUnit>0
+    ? `${(dist*L.mPerUnit).toFixed(1)} 公尺 ÷ ${L.agvSpeed||'?'} 公尺/分`
+    : `${rec?'走道':'直線'} ${Math.round(dist)} 像素 × ${k} 秒/像素`;
+  return {sec:Math.max(1, Math.round(dist*k)), note};
+}
 function buildParamMeta(){
   const out=[];
   for(const id in BLUEPRINTS){
@@ -3189,9 +3212,11 @@ function buildParamMeta(){
       out.push({key:c.selfRetKey,label:`${c.name} 站內回空框`,unit:'秒',min:0,step:5,type:'int',apply:'resim',line:L,section:'route'});
     }
     // 路段行走時間（由 blueprint routeParams 宣告 label/seg）
-    for(const rp of (bp.routeParams||[]))
+    for(const rp of (bp.routeParams||[])){
+      const c=routeCalc(bp, rp);
       out.push({key:rp.key,label:rp.label,unit:'秒',min:1,step:10,type:'int',apply:'resim',line:L,section:'route',
-        seg:rp.seg, calc:rp.calcSec, calcNote:rp.calcNote});
+        seg:rp.seg, calc:c&&c.sec, calcNote:c&&c.note});
+    }
     // 設備數量：並聯機台數
     for(const c of bp.spine){ if(!c.countKey)continue;
       out.push({key:c.countKey,label:`${c.name} 機台數`,unit:'台',min:1,max:9,step:1,type:'int',apply:'resim',line:L,section:'equip'});
