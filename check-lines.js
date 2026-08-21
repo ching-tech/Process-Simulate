@@ -274,6 +274,35 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
     +`走道 0_1=${PA['0_1'].len} 1_0=${PA['1_0'].len}；站內回空框 ${sc.sec}s ← ${sc.note}`);
 }
 
+// 烤箱只有一個門：滿框從那裡進、烤完也從那裡出，取放都停同一個位置
+{
+  const {peBuildAisles,peCompile,setPeState,planDockOf,routeCalc}=ctx.__x;
+  const box={x:500,y:500,w:200,h:120,face:'S'};
+  assert.notDeepStrictEqual(planDockOf(box,0,'in'), planDockOf(box,0,'out'), '一般機台的取放兩側應該不同');
+  const oven={...box, oneDoor:true};
+  assert.deepStrictEqual(planDockOf(oven,0,'in'), planDockOf(oven,0,'out'), '烤箱的取放不在同一個門');
+  // 整條線跑一次：烤箱兩個方向的距離要一樣，一般機台不一樣
+  setPeState({secPerUnit:0.1, planScale:1, name:'烤箱', batch:1, color:'#2e8b57', pick:10, drop:10,
+    teams:[{name:'G1',n:2}],
+    tasks:[{f:0,t:1,c:'full',g:0},{f:1,t:2,c:'full',g:0},{f:2,t:2,c:'empty',g:0}],
+    stns:[{name:'A',type:'src',     val:120,n:1,empty:'',    x:200, y:300, w:120,h:200, face:'S'},
+          {name:'O',type:'buffer',  val:8,  n:1,empty:'',    x:800, y:300, w:200,h:300, face:'S'},
+          {name:'C',type:'transfer',val:180,n:1,empty:'self',x:1400,y:300, w:120,h:200, face:'S'}],
+    aisles:[[[100,700],[1500,700]]]});
+  const PA=peBuildAisles();
+  // A 和 C 對烤箱是對稱的（各離 600px、深度都 200）：從烤箱那個門出發到兩邊一樣遠
+  assert.strictEqual(PA['1_0'].len, PA['1_2'].len, '烤箱端的距離不該隨方向改變');
+  // A 自己還是有出口／入口之分：A→O 比 O→A 多繞 A 的深度 200
+  assert.strictEqual(PA['0_1'].len-PA['1_0'].len, 200, 'A 端沒有分出口／入口');
+  const cp=peCompile();
+  const ovenCol=cp.spine.find(c=>c.type==='buffer').xi;
+  const rp=cp.routeParams.find(r=>r.pair[0]===ovenCol);
+  const chk={...rp}; delete chk.calcSec; delete chk.calcNote;
+  assert.strictEqual(routeCalc(cp, chk).sec, cp.defaults[rp.key], '烤箱出發那段現算對不上（oneDoor 沒帶到）');
+  console.log(`✓ 烤箱單門   進出同一個門：A→O ${PA['0_1'].len} / O→A ${PA['1_0'].len} / O→C ${PA['1_2'].len}`
+    +`（差別只來自對向那一台）`);
+}
+
 // 人員投料站永遠不能被選為空框回程的目的地
 assert.strictEqual(srcRecvFree({noReturn:true,mtype:'refill',s_recv:0,s_recv_res:0}), false, 'noReturn 站仍在收空框');
 

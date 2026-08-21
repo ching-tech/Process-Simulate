@@ -2091,7 +2091,10 @@ function drawPlanStation(g, s, i, gc, b){
     const fl=ns('line');
     fl.setAttribute('x1',e0[0]);fl.setAttribute('y1',e0[1]);fl.setAttribute('x2',e1[0]);fl.setAttribute('y2',e1[1]);
     fl.setAttribute('stroke','#e8a33d');fl.setAttribute('stroke-width','6');fl.setAttribute('stroke-linecap','round');
-    const ft=ns('title'); ft.textContent=`${s.name}：入料側（入滿框／收空框都在這一邊）`; fl.appendChild(ft);
+    const ft=ns('title');
+    ft.textContent=s.buf ? `${s.name}：進出口（滿框從這裡進、烤完也從這裡出）`
+                         : `${s.name}：入料側（入滿框／收空框都在這一邊）`;
+    fl.appendChild(ft);
     g.appendChild(fl);
   }
   // 名稱／UPH／計時放在對側外面，框內整片留給格位
@@ -2171,7 +2174,8 @@ function stnHalfH(s){
 function planBox(s){
   const L=LC.layout; if(!s||L.type!=='plan') return null;
   const sz=L.size&&L.size[s.xi]; if(!sz) return null;
-  return {x:s.x, y:s.y, w:sz[0], h:sz[1], face:(L.face&&L.face[s.xi])||''};
+  // 烤箱只有一個門：滿框從這裡進、烤完也從這裡出，所以不分入料側／對側
+  return {x:s.x, y:s.y, w:sz[0], h:sz[1], face:(L.face&&L.face[s.xi])||'', oneDoor:!!s.buf};
 }
 // AGV 停靠點。side='in'＝入料側（放滿框到入滿框、放空框到收空框都在這邊）、
 // side='out'＝對側（出滿框與退空框在這邊）。沒設入料側就停機台正中
@@ -2179,7 +2183,7 @@ const PLAN_OPP={N:'S',S:'N',W:'E',E:'W'};
 // 純幾何版：給一個佔地框算停靠點（畫圖、AGV、自我檢查共用）
 function planDockOf(b, out, side){
   if(!b||!b.face) return null;
-  const f = side==='out' ? PLAN_OPP[b.face] : b.face;
+  const f = (side==='out' && !b.oneDoor) ? PLAN_OPP[b.face] : b.face;
   const o=out||0, hw=b.w/2, hh=b.h/2;
   return f==='N'?[b.x,b.y-hh-o] : f==='S'?[b.x,b.y+hh+o]
        : f==='W'?[b.x-hw-o,b.y] : [b.x+hw+o,b.y];
@@ -2656,7 +2660,8 @@ function stnTipHTML(i){
     if(!b) return '';
     const f={N:'上',S:'下',W:'左',E:'右'}[b.face];
     const sz = m>0 ? `${(b.w*m).toFixed(1)}×${(b.h*m).toFixed(1)} m` : `${b.w}×${b.h} px`;
-    return `<div class="tt-r tt-dim"><span>佔地${f?`（入料側在${f}）`:''}</span><span>${sz}</span></div>`;
+    const fl = f ? `（${b.oneDoor?'進出口':'入料側'}在${f}）` : '';
+    return `<div class="tt-r tt-dim"><span>佔地${fl}</span><span>${sz}</span></div>`;
   })();
   if(!anyData){ return `<div class="tt-h">${s.name}</div>${box}<div class="tt-dim">尚無產出</div>`; }
   return `<div class="tt-h">${s.name}</div>${box}${rows}`
@@ -2988,7 +2993,7 @@ function updateABFAgvPos(a){
       const d=planDock(s,18,side);
       if(d){
         let f=(LC.layout.face&&LC.layout.face[s.xi])||'';
-        if(side==='out') f=PLAN_OPP[f]||f;
+        if(side==='out' && !s.buf) f=PLAN_OPP[f]||f;
         x=d[0]; ty=d[1];
         if(f==='N'||f==='S') x+=off*42; else ty+=off*30;
       } else { x+=off*42; ty+=stnHalfH(s)+22; }
@@ -3208,11 +3213,13 @@ function routeCalc(bp, rp){
   const [a,b]=rp.pair, SC=L.planScale||1, k=L.secPerUnit||0.1, pos=L.pos;
   const rec=planPathAt(L.paths, a, b);
   // 沒有走道就用「來源出口 → 目的入口」的直線距離（跟編譯時同一套，不然秒數會對不上）
+  const oven={}; (bp.spine||[]).forEach(c=>{ if(c.type==='buffer') oven[c.xi]=1; });
   const dockAt=(x,side)=>{
     if(!pos||!pos[x]) return null;
     const sz=L.size&&L.size[x];
     if(!sz) return pos[x];
-    return planDockOf({x:pos[x][0], y:pos[x][1], w:sz[0], h:sz[1], face:(L.face&&L.face[x])||''},0,side) || pos[x];
+    return planDockOf({x:pos[x][0], y:pos[x][1], w:sz[0], h:sz[1],
+      face:(L.face&&L.face[x])||'', oneDoor:!!oven[x]},0,side) || pos[x];
   };
   const pa=dockAt(a,'out'), pb=dockAt(b,'in');
   const dist = rec ? rec.len*SC : (pa&&pb ? Math.hypot(pa[0]-pb[0], pa[1]-pb[1]) : 0);
@@ -4342,16 +4349,18 @@ function peBoxOf(i){
   const s=peState.stns[i]; if(!s) return null;
   const o=(s.same!=null&&peState.stns[s.same])?peState.stns[s.same]:null, b=o||s;
   const d=peDefSize(b.type);
-  return {x:(o?o.x+14:s.x), y:(o?o.y+14:s.y), w:b.w||d[0], h:b.h||d[1], face:b.face||''};
+  return {x:(o?o.x+14:s.x), y:(o?o.y+14:s.y), w:b.w||d[0], h:b.h||d[1], face:b.face||'',
+          oneDoor:(b.type==='buffer')};   // 烤箱只有一個門，進出同一處
 }
 // AGV 停靠點＝入料側那一邊的中點；沒指定入料側就照舊停正中
-function peDockAt(b){
+function peDockAt(b, side){
   if(!b) return null;
+  const f = (side==='out' && !b.oneDoor) ? (PLAN_OPP[b.face]||b.face) : b.face;
   const hw=b.w/2, hh=b.h/2;
-  return b.face==='N'?[b.x,b.y-hh] : b.face==='S'?[b.x,b.y+hh]
-       : b.face==='W'?[b.x-hw,b.y] : b.face==='E'?[b.x+hw,b.y] : [b.x,b.y];
+  return f==='N'?[b.x,b.y-hh] : f==='S'?[b.x,b.y+hh]
+       : f==='W'?[b.x-hw,b.y] : f==='E'?[b.x+hw,b.y] : [b.x,b.y];
 }
-function peDock(i){ return peDockAt(peBoxOf(i)); }
+function peDock(i, side){ return peDockAt(peBoxOf(i), side); }
 // 走道：把畫的折線接成路網，算出每兩站之間的最短路徑（跟 PLS 的走道資料同格式）
 function peBuildAisles(){
   const polys=(peState.aisles||[]).filter(p=>p.length>=2);
@@ -4416,8 +4425,8 @@ function peBuildAisles(){
   const H={in:[], out:[]};
   peState.stns.forEach((st,si)=>{
     const b=peBoxOf(si);
-    H.in[si] =hook(peDockAt(b) || [st.x,st.y]);
-    H.out[si]=hook(peDockAt({...b, face:PLAN_OPP[b.face]||b.face}) || [st.x,st.y]);
+    H.in[si] =hook(peDockAt(b,'in')  || [st.x,st.y]);
+    H.out[si]=hook(peDockAt(b,'out') || [st.x,st.y]);
   });
   // Dijkstra：從每一站的「出口」出發，走到別站的「入口」。方向不同距離就不同
   const paths={};
@@ -4453,9 +4462,9 @@ function peRender(){
   let h = peState.bg ? `<img src="${peState.bg}" width="${W}" height="${H}" alt="底圖">`
                      : `<div style="width:${W}px;height:${H}px;background:repeating-linear-gradient(45deg,#0000,#0000 12px,#8881 12px,#8881 24px)"></div>`;
   h+=`<svg width="${W}" height="${H}" style="position:absolute;inset:0;pointer-events:none">`;
-  const nodePos=i=>{ const d=peDock(i); return d?{x:d[0],y:d[1]}:null; };
+  const nodePos=(i,side)=>{ const d=peDock(i,side); return d?{x:d[0],y:d[1]}:null; };
   peState.tasks.forEach(t=>{
-    const a=nodePos(t.f), b=nodePos(t.t);
+    const a=nodePos(t.f,'out'), b=nodePos(t.t,'in');   // 從來源的出口拉到目的的入口
     if(!a||!b||t.f===t.t) return;
     const col=PE_PAL[(t.g||0)%PE_PAL.length];
     h+=`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${col}" stroke-width="3"`
@@ -4487,7 +4496,7 @@ function peRender(){
     const o=(s.same!=null&&peState.stns[s.same])?peState.stns[s.same]:null;   // 分身跟著本尊擺
     const b=peBoxOf(i);
     h+=`<div class="pe-node${o?' pe-alias':''}${b.face?' fc-'+b.face:''}" data-i="${i}"`
-      +` title="${s.name}${b.face?'：入料側在'+(PE_FACE.find(f=>f[0]===b.face)||[])[1]:''}（${pePx2U(b.w)}×${pePx2U(b.h)} ${peSizeUnit()}）"`
+      +` title="${s.name}${b.face?'：'+(b.oneDoor?'進出口':'入料側')+'在'+(PE_FACE.find(f=>f[0]===b.face)||[])[1]:''}（${pePx2U(b.w)}×${pePx2U(b.h)} ${peSizeUnit()}）"`
       +` style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px;background:${col}`
       +`${o?';opacity:.85':''}`
       +`${peLink===i?';outline:3px solid #ffb300;outline-offset:2px':''}">${i+1}. ${s.name}`
@@ -4662,7 +4671,8 @@ function peRenderStns(L){ L=L||peLint();
             ?`<option value="${j}"${s.same===j?' selected':''}>＝${j+1}. ${o.name}</option>`:'').join('')
       +`</select></td>`
     +`<td>${peNoEmpty(s.type)?'<span style="color:var(--dim);font-size:11px">不用回空框</span>':`<select onchange="peState.stns[${i}].empty=this.value">${PE_EMPTY.map(e=>`<option value="${e[0]}"${(s.empty||'')===e[0]?' selected':''}>${e[1]}</option>`).join('')}</select>`}</td>`
-    +`<td><select onchange="peState.stns[${i}].face=this.value;peRender()"${peIsAlias(s)?' disabled title="跟本尊共用"':''}>`
+    +`<td${s.type==='buffer'?' title="烤箱只有一個門：滿框從這裡進、烤完也從這裡出"':''}>`
+        +`<select onchange="peState.stns[${i}].face=this.value;peRender()"${peIsAlias(s)?' disabled title="跟本尊共用"':''}>`
         +PE_FACE.map(f=>`<option value="${f[0]}"${((peBoxOf(i)||{}).face||'')===f[0]?' selected':''}>${f[1]}</option>`).join('')+`</select></td>`
     +`<td>${!peHasSeed(s)?'<span style="color:var(--dim);font-size:11px">—</span>':`<select onchange="peState.stns[${i}].seed=+this.value">`
         +`<option value="1"${peSeedOf(s)?' selected':''}>有</option><option value="0"${peSeedOf(s)?'':' selected'}>無</option></select>`}</td>`
@@ -4767,7 +4777,7 @@ function peCompile(){
   };
   const colStn=x=>S[own.findIndex((o,j)=>col[j]===x)];
   const boxOfCol=x=>{ const o=colStn(x), d=peDefSize(o.type);
-    return {x:o.x, y:o.y, w:o.w||d[0], h:o.h||d[1], face:o.face||''}; };
+    return {x:o.x, y:o.y, w:o.w||d[0], h:o.h||d[1], face:o.face||'', oneDoor:(o.type==='buffer')}; };
   // 一趟搬運的距離＝來源「出口側」到目的「入口側」，方向不同距離就不同 → 兩個方向各一格參數
   const paths={};
   const routeParams=[], seen={};
@@ -4778,8 +4788,8 @@ function peCompile(){
     const rec=pathOf(a,b); if(rec) paths[`${a}_${b}`]=rec;
     const oa=colStn(a), ob=colStn(b);
     const ba=boxOfCol(a), bb=boxOfCol(b);
-    const da=peDockAt({...ba, face:PLAN_OPP[ba.face]||ba.face});     // 來源的出口側
-    const db=peDockAt(bb);                                           // 目的的入口側
+    const da=peDockAt(ba,'out');     // 來源的出口側（烤箱就是它那唯一的門）
+    const db=peDockAt(bb,'in');      // 目的的入口側
     const dist=rec ? rec.len*SC : Math.hypot(da[0]-db[0], da[1]-db[1]);
     const calc=Math.max(1, Math.round(dist*peState.secPerUnit));
     const note = peState.mPerUnit>0
