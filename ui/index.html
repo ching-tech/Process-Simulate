@@ -470,8 +470,8 @@ html[data-theme=dark] #clk{color:var(--yellow)}
       <label>底圖</label><input id="pe-bg" type="file" accept="image/*" onchange="peLoadBg(event)" style="width:170px;font-size:11px">
       <label title="圖上 1 像素等於幾公尺。用「📏 量距離」量一段已知長度就會自動算出來，之後機台尺寸都能用公尺填">公尺/像素</label><input id="pe-mpp" type="number" min="0" step="0.001" placeholder="未校正" style="width:64px" onchange="peSetMpp(+this.value)">
       <label title="圖上 1 像素等於幾秒的走行時間">秒/像素</label><input id="pe-spu" type="number" min="0.001" step="0.01" value="0.1" style="width:56px" onchange="peSync()">
-      <label title="用「📏 量距離」量一段已知長度來換算">實際距離</label><input id="pe-cal-m" type="number" min="0" step="0.5" placeholder="公尺" style="width:56px">
-      <label>AGV 速度</label><input id="pe-cal-v" type="number" min="0" step="1" value="60" style="width:56px" title="公尺/分">
+      <label title="用「📏 量距離」量一段已知長度來換算">實際距離（公尺）</label><input id="pe-cal-m" type="number" min="0" step="0.5" placeholder="公尺" style="width:56px" aria-label="實際距離，單位公尺">
+      <label title="AGV 走行速度">AGV 速度（公尺/分）</label><input id="pe-cal-v" type="number" min="0" step="1" value="60" style="width:56px" aria-label="AGV 速度，單位公尺每分">
     </div>
     <div class="wsec"><h4>② 圖面（點兩下新增機台、拖曳搬位置、拖右下角改大小；Ctrl+Z 復原）</h4>
       <div id="pe-tools" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px"></div>
