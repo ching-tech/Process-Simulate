@@ -162,6 +162,29 @@ const {BLUEPRINTS,validateBlueprint,dryRunBlueprint,GRP_CLR,srcRecvFree,buildLin
     +`同一台 ${src.stns.filter(s=>s.same!=null).length} 組 / 走道 ${Object.keys(cp.layout.paths).length} 段 — ${dr2.msg}`);
 }
 
+// PLS 每一欄都要有佔地與入料側，而且格位排出來要落在框內
+{
+  const {planCardGeom}=ctx.__x, L=BLUEPRINTS.pls.layout;
+  const nm={}; BLUEPRINTS.pls.spine.forEach(c=>{ if(!(c.xi in nm)) nm[c.xi]=c.name; });
+  const mt={}; BLUEPRINTS.pls.spine.forEach(c=>{ if(!(c.xi in mt)) mt[c.xi]=c.type; });
+  assert.strictEqual((L.size||[]).length, L.xiCount, 'PLS 有欄位沒給佔地');
+  for(let x=0;x<L.xiCount;x++){
+    const [w,h]=L.size[x], f=L.face[x];
+    assert.ok(w>=40&&h>=40, `${nm[x]} 佔地太小：${w}x${h}`);
+    assert.ok('NSWE'.includes(f), `${nm[x]} 沒有指定入料側`);
+    if(mt[x]==='buffer') continue;                    // 緩衝站沒有格位
+    const b={x:L.pos[x][0], y:L.pos[x][1], w, h, face:f};
+    const {slots}=planCardGeom(b, mt[x]);
+    for(const k in slots){                            // 每一格都要在機台框裡面
+      assert.ok(Math.abs(slots[k][0]-b.x)<=w/2 && Math.abs(slots[k][1]-b.y)<=h/2,
+        `${nm[x]} 的 ${k} 跑出機台框外`);
+    }
+  }
+  const f=x=>({N:'上',S:'下',W:'左',E:'右'})[L.face[x]];
+  console.log(`✓ pls 佔地   10 欄都有佔地與入料側（③ 左線體 ${L.size[2].join('x')} 入料側${f(2)}、`
+    +`⑧⑫ 研磨線 ${L.size[3].join('x')} 入料側${f(3)}，跟站名的「北入/南出」一致）`);
+}
+
 // 人員投料站永遠不能被選為空框回程的目的地
 assert.strictEqual(srcRecvFree({noReturn:true,mtype:'refill',s_recv:0,s_recv_res:0}), false, 'noReturn 站仍在收空框');
 

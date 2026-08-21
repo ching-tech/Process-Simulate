@@ -661,20 +661,23 @@ const BLUEPRINTS = {
 // pt   ＝ 該點在 H05 5F 平面圖上的座標(PDF pt)，用來算走行距離；n＝並聯台數
 // selfReturn ＝ 空框不回上游，而是在站內從入料端搬到出料端（例：⑧ 回 ⑧）
 // dropEmpty  ＝ 退下來的空框由人員收走（線尾）
+// box:[寬,高] ＝ 機台在平面圖上佔的地（畫布像素）。face ＝ 入料側：入滿框和收空框在這一邊。
+// 入料側是照「滿框從哪一站送過來」推的；③ 與 ⑧⑫ 的站名本來就寫著「北入/南出」，跟推出來的一致。
+// ponytail: box 是目測估的，沒有現場實測尺寸；量過就在平面版面編輯器直接改，或改這裡的數字
 const PLS_STNS=[
-  ['① 上下料機(進板)',   'refill',  360, {xi:0, pt:[528,228], noReturn:true}], // 人員投料，不收空框
-  ['② PLG PRC (8爐)',    'buffer',  8,   {xi:1, pt:[549,139]}],
-  ['③ 左線體(北入/南出)','transfer',360, {xi:2, pt:[320,143], selfReturn:true}],
-  ['④ PLG BAK (8爐)',    'buffer',  8,   {xi:4, pt:[ 35,137]}],
-  ['⑤⑨ 板件庫(暫存架)', 'transfer',360, {xi:5, pt:[323,467], selfReturn:true}],
-  ['⑥ 垂直式塞孔機',     'transfer',360, {xi:6, pt:[309,349], n:2, selfReturn:true}],
-  ['⑦⑪ PLG BAK (16爐)', 'buffer',  16,  {xi:7, pt:[538,316]}],
-  ['⑧⑫ 研磨線(北入/南出)','transfer',360,{xi:3, pt:[358,169], selfReturn:true}],
+  ['① 上下料機(進板)',   'refill',  360, {xi:0, pt:[528,228], noReturn:true, box:[150,140], face:'N'}], // 人員投料，不收空框
+  ['② PLG PRC (8爐)',    'buffer',  8,   {xi:1, pt:[549,139], box:[180,130], face:'E'}],
+  ['③ 左線體(北入/南出)','transfer',360, {xi:2, pt:[320,143], selfReturn:true, box:[150,300], face:'N'}], // 北入南出：長邊南北向
+  ['④ PLG BAK (8爐)',    'buffer',  8,   {xi:4, pt:[ 35,137], box:[180,130], face:'N'}],
+  ['⑤⑨ 板件庫(暫存架)', 'transfer',360, {xi:5, pt:[323,467], selfReturn:true, box:[280,150], face:'W'}],
+  ['⑥ 垂直式塞孔機',     'transfer',360, {xi:6, pt:[309,349], n:2, selfReturn:true, box:[170,170], face:'E'}],
+  ['⑦⑪ PLG BAK (16爐)', 'buffer',  16,  {xi:7, pt:[538,316], box:[240,140], face:'S'}],
+  ['⑧⑫ 研磨線(北入/南出)','transfer',360,{xi:3, pt:[358,169], selfReturn:true, box:[150,260], face:'N'}], // 北入南出：長邊南北向
   ['⑨ 板件庫(第2次)',    'transfer',360, {xi:5, same:4, selfReturn:true}],
-  ['⑩ 工作桌(檢視)',     'transfer',360, {xi:8, pt:[445,372], n:2, selfReturn:true}],
+  ['⑩ 工作桌(檢視)',     'transfer',360, {xi:8, pt:[445,372], n:2, selfReturn:true, box:[190,160], face:'S'}],
   ['⑪ PLG BAK (第2次)',  'buffer',  16,  {xi:7, same:6}],
   ['⑫ 研磨線(第2次)',    'transfer',360, {xi:3, same:7, selfReturn:true}],
-  ['⑬ 出料換框機',       'changer', 360, {xi:9, pt:[158,493], dropEmpty:true}],
+  ['⑬ 出料換框機',       'changer', 360, {xi:9, pt:[158,493], dropEmpty:true, box:[170,140], face:'W'}],
 ];
 // AGV 分隊：一隊管好幾段。half:'A'＝只做 來源→烤箱，'B'＝只做 烤箱→目的
 // selfRet ＝ 這一隊負責哪些站的「站內空框回程」（出料端要的空框＝自己入料端退下來的）
@@ -693,7 +696,7 @@ BLUEPRINTS.pls = (function(){
   const XI=PLS_STNS.map(([,,,o])=>o.xi), NX=Math.max(...XI)+1;          // 現場欄位數
   const own=PLS_STNS.map(([,,,o],i)=> o.same!=null ? o.same : i);       // 參數來自哪一站
   const shared=new Set(own.filter((v,i)=>v!==i));
-  const PT=[];                                                          // 每欄在平面圖上的座標
+  const PT=[], SZ=[], FC=[];                                            // 每欄在平面圖上的座標／佔地／入料側
   PLS_STNS.forEach(([name,type,val,opt],i)=>{
     const p=own[i], mine=(p===i), x=opt.xi;
     const c={role:'s'+i, type, name, xi:x};
@@ -703,6 +706,7 @@ BLUEPRINTS.pls = (function(){
     // 站內回空框：⑤⑨、⑧⑫ 是同一台，共用同一個時間參數
     if(opt.selfReturn){ c.selfReturn=true; c.selfRetKey=`${id}_r${p}`; if(mine) D[c.selfRetKey]=30; }
     if(opt.pt) PT[x]=opt.pt;
+    if(mine){ SZ[x]=opt.box||[192,168]; FC[x]=opt.face||''; }
     if(shared.has(p)) c.share='eq'+p;                                   // 同一台設備 → 產能共用
     if(type==='buffer'){ c.bufKey=`${id}_b${p}`; if(mine) D[c.bufKey]=val; }
     else{
@@ -775,7 +779,7 @@ BLUEPRINTS.pls = (function(){
     routeParams, spine, groups, defaults:D, schemaVersion:1,
     fallbackSec:secs,   // 未列為參數的站間距離，一律照平面圖走道算
 
-    layout:{ type:'plan', pos, xiCount:NX, zones, zoneGrp, planScale:S,
+    layout:{ type:'plan', pos, xiCount:NX, zones, zoneGrp, planScale:S, size:SZ, face:FC,
       aisles:AIS?AIS.segs:null, paths:AIS?AIS.paths:null,   // AGV 走道網與站間路徑
       bg:{href:'plan-h05.png', w:W, h:H},   // H05 5F 平面圖（淡化後）當底圖
       header:'PLS 製程線（H05 5F 平面配置）', baseVB:`0 0 ${W} ${H}`,
@@ -1230,8 +1234,11 @@ function computeGeom(L){
   } else if(lay.type==='plan'){
     // 平面圖版面：座標直接來自現場圖，AGV 走兩點之間的直線（去程走上方、回程走下方）
     L.defs.forEach((d,i)=>{
-      // 同位置多台機並排（平面圖上本來就是左右並排，不是上下疊）
-      const p=lay.pos[d.xi]||[0,0], x=p[0]+(d.sub||0)*190, y=p[1];
+      // 同位置多台機並排：沿著入料側那條邊排開，才不會擋住彼此的入料側
+      const p=lay.pos[d.xi]||[0,0], k=d.sub||0;
+      const sz=lay.size&&lay.size[d.xi], f=(lay.face&&lay.face[d.xi])||'';
+      const x = (sz && (f==='W'||f==='E')) ? p[0] : p[0]+k*(sz?sz[0]+22:190);
+      const y = (sz && (f==='W'||f==='E')) ? p[1]+k*(sz[1]+22) : p[1];
       out[i]={x, y, tfy:y, tyr:y};   // 走道折線自己決定路徑，不用上下分軌
     });
   } else { // 'row'
@@ -2051,15 +2058,15 @@ function drawPlanStation(g, s, i, gc, b){
   }
   // 緩衝站沒有格位，畫存量數字與長條
   if(s.buf){
-    const c0=pt(D*0.42,0), c1=pt(D*0.62,0);
+    const c0=[b.x, b.y-2], c1=[b.x, b.y+10];
     const wt=ns('text');wt.setAttribute('x',c0[0]);wt.setAttribute('y',c0[1]);
     wt.setAttribute('class','slb');wt.setAttribute('style','fill:#b8860b;font-size:15px;font-weight:bold');
     wt.setAttribute('id',`abf-buf-${i}`);wt.textContent=`0/${s.buf}`; g.appendChild(wt);
     const bw=Math.min(b.w-16, 88);
-    const bx=ns('rect');bx.setAttribute('x',c1[0]-bw/2);bx.setAttribute('y',c1[1]-3);
+    const bx=ns('rect');bx.setAttribute('x',c1[0]-bw/2);bx.setAttribute('y',c1[1]);
     bx.setAttribute('width',bw);bx.setAttribute('height',7);bx.setAttribute('rx',3);
     bx.setAttribute('fill','#e3e9f2'); g.appendChild(bx);
-    const bf=ns('rect');bf.setAttribute('x',c1[0]-bw/2);bf.setAttribute('y',c1[1]-3);
+    const bf=ns('rect');bf.setAttribute('x',c1[0]-bw/2);bf.setAttribute('y',c1[1]);
     bf.setAttribute('width',0);bf.setAttribute('height',7);bf.setAttribute('rx',3);
     bf.setAttribute('fill',gc.lbl);bf.setAttribute('id',`abf-bar-${i}`); g.appendChild(bf);
     return;
