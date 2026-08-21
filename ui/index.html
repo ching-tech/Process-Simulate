@@ -940,10 +940,26 @@ function registerCustomLine(bp, force){
   if(bp.defaults) for(const k in bp.defaults){ DEF[k]=bp.defaults[k]; if(force || !(k in P)) P[k]=bp.defaults[k]; }
 }
 function loadCustomLines(){
-  try{ const raw=localStorage.getItem(LINE_STORE_KEY); if(!raw) return;
-    const arr=JSON.parse(raw);
-    if(Array.isArray(arr)) arr.forEach(bp=>{ if(bp&&bp.id&&!BLUEPRINTS[bp.id]) registerCustomLine(bp); });
-  }catch(_){}
+  let raw=null;
+  try{ raw=localStorage.getItem(LINE_STORE_KEY); }catch(e){
+    setTimeout(()=>toast('讀不到瀏覽器儲存的自訂線：'+((e&&e.name)||e),'err'),400); return; }
+  if(!raw) return;
+  let arr=null;
+  try{ arr=JSON.parse(raw); }catch(e){
+    setTimeout(()=>toast('自訂線的存檔壞了，讀不出來（'+((e&&e.name)||e)+'）','err'),400); return; }
+  if(!Array.isArray(arr)) return;
+  // 一條一條各自 try：以前整個迴圈包一個 try，任何一條有問題就「全部」的線都不見了
+  const bad=[];
+  for(const bp of arr){
+    if(!bp||!bp.id||BLUEPRINTS[bp.id]) continue;
+    try{
+      // 先驗一次：壞掉的線如果登記進去，rebuildParamMeta 會炸，整個畫面就起不來
+      const v=validateBlueprint(bp);
+      if(!v.ok) throw new Error(v.errors.slice(0,2).join('、'));
+      registerCustomLine(bp);
+    }catch(e){ delete BLUEPRINTS[bp.id]; bad.push(`${bp.name||bp.id}（${(e&&e.message)||e}）`); }
+  }
+  if(bad.length){ const m='有 '+bad.length+' 條自訂線讀不進來：\n• '+bad.join('\n• '); setTimeout(()=>toast(m,'err'),400); }
 }
 function saveCustomLines(){
   try{ localStorage.setItem(LINE_STORE_KEY, JSON.stringify(Object.values(BLUEPRINTS).filter(b=>b.custom))); return true; }
